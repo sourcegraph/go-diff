@@ -3,7 +3,10 @@
 Diff parser and printer for Go.
 
 It doesn't actually compute a diff. It only reads in (and prints out,
-given a Go struct representation) unified diff output, such as:
+given a Go struct representation) unified diff output, such as the
+following. The corresponding data structure in Go is the
+[diff.Diff](https://sourcegraph.com/github.com/sourcegraph/go-diff/.GoPackage/github.com/sourcegraph/go-diff/diff/.def/Diff)
+struct.
 
 ```diff
 @@ -1,3 +1,9 @@ Section Header
