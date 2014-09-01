@@ -1,4 +1,4 @@
-# go-diff
+# go-diff [![status](https://sourcegraph.com/api/repos/github.com/sourcegraph/go-diff/.badges/status.png)](https://sourcegraph.com/github.com/sourcegraph/go-diff) [![top func](https://sourcegraph.com/api/repos/github.com/sourcegraph/go-diff/.badges/top-func.png)](https://sourcegraph.com/github.com/sourcegraph/go-diff) [![views](https://sourcegraph.com/api/repos/github.com/sourcegraph/go-diff/.counters/views.png)](https://sourcegraph.com/github.com/sourcegraph/go-diff)
 
 Diff parser and printer for Go.
 
