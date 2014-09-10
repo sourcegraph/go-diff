@@ -6,8 +6,94 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
+
+// ParseMultiFileDiff parses a multi-file unified diff.
+func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
+	return NewMultiFileDiffReader(bytes.NewReader(diff)).ReadAllFiles()
+}
+
+// NewMultiFileDiffReader returns a new MultiFileDiffReader that reads
+// a multi-file unified diff from r.
+func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
+	return &MultiFileDiffReader{scanner: bufio.NewScanner(r)}
+}
+
+// MultiFileDiffReader reads a multi-file unified diff.
+type MultiFileDiffReader struct {
+	line    int
+	offset  int64
+	scanner *bufio.Scanner
+
+	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
+
+	// nextFileFirstLine is a line that was read by a HunksReader that
+	// was how it determined the hunk was complete. But to determine
+	// that, it needed to read the first line of the next file. We
+	// store nextFileFirstLine so we can "give the first line back" to
+	// the next file.
+	nextFileFirstLine []byte
+}
+
+// ReadFile reads the next file unified diff (including headers and
+// all hunks) from r. If there are no more files in the diff, it
+// returns error io.EOF.
+func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
+	fr := &FileDiffReader{
+		line:           r.line,
+		offset:         r.offset,
+		scanner:        r.scanner,
+		fileHeaderLine: r.nextFileFirstLine,
+	}
+	r.nextFileFirstLine = nil
+
+	d, err := fr.ReadAllHeaders()
+	if err != nil {
+		if e0, ok := err.(*ParseError); ok {
+			if e0.Err == ErrNoFileHeader || e0.Err == ErrExtendedHeadersEOF {
+				return nil, io.EOF
+			}
+		}
+		return nil, err
+	}
+
+	d.Hunks, err = fr.HunksReader().ReadAllHunks()
+	r.line = fr.line
+	r.offset = fr.offset
+	if err != nil {
+		if e0, ok := err.(*ParseError); ok {
+			if e, ok := e0.Err.(*ErrBadHunkLine); ok {
+				// This just means we finished reading the hunks for the
+				// current file. See the ErrBadHunkLine doc for more info.
+				r.nextFileFirstLine = e.Line
+				return d, nil
+			}
+		}
+		return nil, err
+	}
+
+	return d, nil
+}
+
+// ReadAllFiles reads all file unified diffs (including headers and all
+// hunks) remaining in r.
+func (r *MultiFileDiffReader) ReadAllFiles() ([]*FileDiff, error) {
+	var ds []*FileDiff
+	for {
+		d, err := r.ReadFile()
+		if d != nil {
+			ds = append(ds, d)
+		}
+		if err == io.EOF {
+			return ds, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+}
 
 // ParseFileDiff parses a file unified diff.
 func ParseFileDiff(diff []byte) (*FileDiff, error) {
@@ -26,9 +112,13 @@ type FileDiffReader struct {
 	offset  int64
 	scanner *bufio.Scanner
 
-	// fileHeaderLine is the first file header line, set by
-	// ReadExtendedHeaders if it encroaches on a file header line
-	// (which it must to detect when extended headers are done).
+	// fileHeaderLine is the first file header line, set by:
+	//
+	// (1) ReadExtendedHeaders if it encroaches on a file header line
+	//     (which it must to detect when extended headers are done); or
+	// (2) (*MultiFileDiffReader).ReadFile() if it encroaches on a
+	//     file header line while reading the previous file's hunks (in a
+	//     multi-file diff).
 	fileHeaderLine []byte
 }
 
@@ -108,6 +198,9 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 		if !ok {
 			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		}
+		if err := r.scanner.Err(); err != nil {
+			return "", nil, err
+		}
 		line = r.scanner.Bytes()
 	} else {
 		line = r.fileHeaderLine
@@ -136,18 +229,28 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	return filename, timestamp, err
 }
 
+var i = 0
+
 // ReadExtendedHeaders reads the extended header lines, if any, from a
 // unified diff file (e.g., git's "diff --git a/foo.go b/foo.go", "new
 // mode <mode>", "rename from <path>", etc.).
 func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 	var xheaders []string
 	for {
-		ok := r.scanner.Scan()
-		if !ok {
-			return nil, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
+		var line []byte
+		if r.fileHeaderLine == nil {
+			ok := r.scanner.Scan()
+			if !ok {
+				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
+			}
+			if err := r.scanner.Err(); err != nil {
+				return xheaders, err
+			}
+			line = r.scanner.Bytes()
+		} else {
+			line = r.fileHeaderLine
+			r.fileHeaderLine = nil
 		}
-
-		line := r.scanner.Bytes()
 
 		if bytes.HasPrefix(line, []byte("--- ")) {
 			// We've reached the file header.
@@ -159,6 +262,21 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 		r.offset += int64(len(line))
 		xheaders = append(xheaders, string(line))
 	}
+}
+
+func readRest(s *bufio.Scanner) string {
+	var lines []string
+	for {
+		ok := s.Scan()
+		if !ok {
+			break
+		}
+		if s.Err() != nil {
+			break
+		}
+		lines = append(lines, s.Text())
+	}
+	return strings.Join(lines, "\n")
 }
 
 var (
@@ -202,7 +320,8 @@ type HunksReader struct {
 	nextHunkHeaderLine []byte
 }
 
-// ReadHunk reads one hunk from r.
+// ReadHunk reads one hunk from r. If there are no more hunks, it
+// returns error io.EOF.
 func (r *HunksReader) ReadHunk() (*Hunk, error) {
 	r.hunk = nil
 	var line []byte
@@ -265,6 +384,14 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return r.hunk, nil
 			}
 
+			if len(line) >= 1 && line[0] != ' ' && line[0] != '-' && line[0] != '+' {
+				// Bad hunk header line. If we're reading a multi-file
+				// diff, this may be the end of the current
+				// file. Return a "rich" error that lets our caller
+				// handle that case.
+				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+			}
+
 			r.hunk.Body = append(r.hunk.Body, line...)
 			r.hunk.Body = append(r.hunk.Body, '\n')
 		}
@@ -291,10 +418,12 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 		if err == io.EOF {
 			return hunks, nil
 		}
-		if err != nil {
-			return nil, err
+		if hunk != nil {
+			hunks = append(hunks, hunk)
 		}
-		hunks = append(hunks, hunk)
+		if err != nil {
+			return hunks, err
+		}
 	}
 }
 
@@ -318,3 +447,15 @@ var (
 	// header was encountered during parsing.
 	ErrBadHunkHeader = errors.New("bad hunk header")
 )
+
+// ErrBadHunkLine is when a line not beginning with ' ', '-', or '+'
+// is encountered while reading a hunk. In the context of reading a
+// single hunk or file, it is an unexpected error. In a multi-file
+// diff, however, it indicates that the current file's diff is
+// complete (and remaining diff data will describe another file
+// unified diff).
+type ErrBadHunkLine struct {
+	Line []byte
+}
+
+func (e *ErrBadHunkLine) Error() string { return "bad hunk line (does not start with ' ', '-', or '+')" }

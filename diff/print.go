@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+// PrintMultiFileDiff prints a multi-file diff in unified diff format.
+func PrintMultiFileDiff(ds []*FileDiff) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, d := range ds {
+		diff, err := PrintFileDiff(d)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := buf.Write(diff); err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
+}
+
 // PrintFileDiff prints a FileDiff in unified diff format.
 //
 // TODO(sqs): handle escaping whitespace/etc. chars in filenames
