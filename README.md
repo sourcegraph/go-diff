@@ -5,10 +5,12 @@ Diff parser and printer for Go.
 It doesn't actually compute a diff. It only reads in (and prints out,
 given a Go struct representation) unified diff output, such as the
 following. The corresponding data structure in Go is the
-[diff.Diff](https://sourcegraph.com/github.com/sourcegraph/go-diff/.GoPackage/github.com/sourcegraph/go-diff/diff/.def/Diff)
+[diff.FileDiff](https://sourcegraph.com/github.com/sourcegraph/go-diff/.GoPackage/github.com/sourcegraph/go-diff/diff/.def/FileDiff)
 struct.
 
 ```diff
+--- oldname	2009-10-11 15:12:20.000000000 -0700
++++ newname	2009-10-11 15:12:30.000000000 -0700
 @@ -1,3 +1,9 @@ Section Header
 +This is an important
 +notice! It should
