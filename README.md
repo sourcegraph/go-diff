@@ -2,6 +2,8 @@
 
 Diff parser and printer for Go.
 
+**Unstable API:** go-diff is currently in development. If you depend on it, you should vendor it.
+
 It doesn't actually compute a diff. It only reads in (and prints out,
 given a Go struct representation) unified diff output, such as the
 following. The corresponding data structure in Go is the
