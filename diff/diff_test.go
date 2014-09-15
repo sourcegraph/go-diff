@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -62,7 +63,10 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		{
 			filename: "sample_file_extended.diff",
 		},
-		{filename: "empty.diff"},
+		{
+			filename:     "empty.diff",
+			wantParseErr: &ParseError{0, 0, ErrExtendedHeadersEOF},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
@@ -70,7 +74,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 			t.Fatal(err)
 		}
 		diff, err := ParseFileDiff(diffData)
-		if err != test.wantParseErr {
+		if !reflect.DeepEqual(err, test.wantParseErr) {
 			t.Errorf("%s: got ParseFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
 			continue
 		}
