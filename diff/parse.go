@@ -364,7 +364,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return nil, err
 			}
 			if n < len(items) {
-				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: header}}
+				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
 			}
 
 			r.hunk.Section = section
