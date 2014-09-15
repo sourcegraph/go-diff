@@ -22,18 +22,16 @@ func TestParseHunkNoChunksize(t *testing.T) {
 		t.Errorf("%s: Got %d hunks, want only one", filename, len(diff))
 	}
 
+	correct := &Hunk{
+		NewLines:      1,
+		NewStartLine:  1,
+		OrigLines:     0,
+		OrigStartLine: 0,
+	}
 	h := diff[0]
-	if h.NewLines != 1 {
-		t.Errorf("%s: Got NewLines %d , want 1", filename, h.NewLines)
-	}
-	if h.NewStartLine != 1 {
-		t.Errorf("%s: Got NewStartLine %d , want 1", filename, h.NewStartLine)
-	}
-	if h.OrigLines != 0 {
-		t.Errorf("%s: Got OrigLines %d , want 0", filename, h.OrigLines)
-	}
-	if h.OrigStartLine != 0 {
-		t.Errorf("%s: Got OrigStartLine %d , want 0", filename, h.OrigStartLine)
+	h.Body = nil // We're not testing the body.
+	if !reflect.DeepEqual(h, correct) {
+		t.Errorf("%s: Got %#v, want %#v", filename, h, correct)
 	}
 }
 

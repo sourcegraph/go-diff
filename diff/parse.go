@@ -357,14 +357,14 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			}
 			header, section, err := normalizeHeader(string(line))
 			if err != nil {
-				return nil, &ParseError{r.line, r.offset, ErrBadHunkHeader}
+				return nil, &ParseError{r.line, r.offset, err}
 			}
 			n, err := fmt.Sscanf(header, hunkHeader, items...)
 			if err != nil {
 				return nil, err
 			}
 			if n < len(items) {
-				return nil, &ParseError{r.line, r.offset, ErrBadHunkHeader}
+				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: header}}
 			}
 
 			r.hunk.Section = section
@@ -416,14 +416,15 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 // if its value is 1. normalizeHeader returns an error if the header
 // is not in the correct format.
 func normalizeHeader(header string) (string, string, error) {
-	err := fmt.Errorf("header in incorrect format: %s", header)
-	pieces := strings.Split(header, " ")
+	// Split the header into five parts: the first '@@', the two
+	// ranges, the last '@@', and the optional section.
+	pieces := strings.SplitN(header, " ", 5)
 	if len(pieces) < 4 {
-		return "", "", err
+		return "", "", &ErrBadHunkHeader{header: header}
 	}
 
 	if pieces[0] != "@@" {
-		return "", "", err
+		return "", "", &ErrBadHunkHeader{header: header}
 	}
 	for i := 1; i < 3; i++ {
 		if !strings.ContainsRune(pieces[i], ',') {
@@ -431,18 +432,12 @@ func normalizeHeader(header string) (string, string, error) {
 		}
 	}
 	if pieces[3] != "@@" {
-		return "", "", err
+		return "", "", &ErrBadHunkHeader{header: header}
 	}
 
 	var section string
-	if len(pieces) > 4 {
-		delim := "@@"
-		s := strings.TrimPrefix(header, delim)
-		i := strings.Index(s, delim)
-		if i == -1 {
-			return "", "", err
-		}
-		section = s[i+len(delim):]
+	if len(pieces) == 5 {
+		section = pieces[4]
 	}
 	return strings.Join(pieces, " "), strings.TrimSpace(section), nil
 }
@@ -478,15 +473,22 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("line %d, char %d: %s", e.Line, e.Offset, e.Err)
 }
 
-var (
-	// ErrNoHunkHeader indicates that a unified diff hunk header was
-	// expected but not found during parsing.
-	ErrNoHunkHeader = errors.New("no hunk header")
+// ErrNoHunkHeader indicates that a unified diff hunk header was
+// expected but not found during parsing.
+var ErrNoHunkHeader = errors.New("no hunk header")
 
-	// ErrBadHunkHeader indicates that a malformed unified diff hunk
-	// header was encountered during parsing.
-	ErrBadHunkHeader = errors.New("bad hunk header")
-)
+// ErrBadHunkHeader indicates that a malformed unified diff hunk
+// header was encountered during parsing.
+type ErrBadHunkHeader struct {
+	header string
+}
+
+func (e *ErrBadHunkHeader) Error() string {
+	if e.header == "" {
+		return "bad hunk header"
+	}
+	return "bad hunk header: " + e.header
+}
 
 // ErrBadHunkLine is when a line not beginning with ' ', '-', or '+'
 // is encountered while reading a hunk. In the context of reading a
