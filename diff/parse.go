@@ -355,19 +355,19 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				&r.hunk.OrigStartLine, &r.hunk.OrigLines,
 				&r.hunk.NewStartLine, &r.hunk.NewLines,
 			}
-			br := bytes.NewReader(line)
-			n, err := fmt.Fscanf(br, hunkHeader, items...)
+			header, section, err := normalizeHeader(string(line))
+			if err != nil {
+				return nil, &ParseError{r.line, r.offset, err}
+			}
+			n, err := fmt.Sscanf(header, hunkHeader, items...)
 			if err != nil {
 				return nil, err
 			}
 			if n < len(items) {
-				return nil, &ParseError{r.line, r.offset, ErrBadHunkHeader}
+				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
 			}
 
-			// Any unread portion of the line is the (optional) section heading.
-			if br.Len() > 0 {
-				r.hunk.Section = string(bytes.TrimSpace(line[len(line)-br.Len():]))
-			}
+			r.hunk.Section = section
 		} else {
 			// Read hunk body line.
 			if bytes.HasPrefix(line, hunkPrefix) {
@@ -407,6 +407,41 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 	return nil, io.EOF
 }
 
+// normalizeHeader takes a header of the form:
+// "@@ -linestart[,chunksize] +linestart[,chunksize] @@ section"
+// and returns two strings, with the first in the form:
+// "@@ -linestart,chunksize +linestart,chunksize @@".
+// where linestart and chunksize are both integers. The second is the
+// optional section header. chunksize may be omitted from the header
+// if its value is 1. normalizeHeader returns an error if the header
+// is not in the correct format.
+func normalizeHeader(header string) (string, string, error) {
+	// Split the header into five parts: the first '@@', the two
+	// ranges, the last '@@', and the optional section.
+	pieces := strings.SplitN(header, " ", 5)
+	if len(pieces) < 4 {
+		return "", "", &ErrBadHunkHeader{header: header}
+	}
+
+	if pieces[0] != "@@" {
+		return "", "", &ErrBadHunkHeader{header: header}
+	}
+	for i := 1; i < 3; i++ {
+		if !strings.ContainsRune(pieces[i], ',') {
+			pieces[i] = pieces[i] + ",1"
+		}
+	}
+	if pieces[3] != "@@" {
+		return "", "", &ErrBadHunkHeader{header: header}
+	}
+
+	var section string
+	if len(pieces) == 5 {
+		section = pieces[4]
+	}
+	return strings.Join(pieces, " "), strings.TrimSpace(section), nil
+}
+
 // ReadAllHunks reads all remaining hunks from r. A successful call
 // returns err == nil, not err == EOF. Because ReadAllHunks is defined
 // to read until EOF, it does not treat end of file as an error to be
@@ -438,15 +473,22 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("line %d, char %d: %s", e.Line, e.Offset, e.Err)
 }
 
-var (
-	// ErrNoHunkHeader indicates that a unified diff hunk header was
-	// expected but not found during parsing.
-	ErrNoHunkHeader = errors.New("no hunk header")
+// ErrNoHunkHeader indicates that a unified diff hunk header was
+// expected but not found during parsing.
+var ErrNoHunkHeader = errors.New("no hunk header")
 
-	// ErrBadHunkHeader indicates that a malformed unified diff hunk
-	// header was encountered during parsing.
-	ErrBadHunkHeader = errors.New("bad hunk header")
-)
+// ErrBadHunkHeader indicates that a malformed unified diff hunk
+// header was encountered during parsing.
+type ErrBadHunkHeader struct {
+	header string
+}
+
+func (e *ErrBadHunkHeader) Error() string {
+	if e.header == "" {
+		return "bad hunk header"
+	}
+	return "bad hunk header: " + e.header
+}
 
 // ErrBadHunkLine is when a line not beginning with ' ', '-', or '+'
 // is encountered while reading a hunk. In the context of reading a

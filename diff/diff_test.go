@@ -8,6 +8,33 @@ import (
 	"testing"
 )
 
+func TestParseHunkNoChunksize(t *testing.T) {
+	filename := "sample_no_chunksize.diff"
+	diffData, err := ioutil.ReadFile(filepath.Join("testdata", filename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diff, err := ParseHunks(diffData)
+	if err != nil {
+		t.Errorf("%s: got ParseHunks err %v,  want %v", filename, err, nil)
+	}
+	if len(diff) != 1 {
+		t.Errorf("%s: Got %d hunks, want only one", filename, len(diff))
+	}
+
+	correct := &Hunk{
+		NewLines:      1,
+		NewStartLine:  1,
+		OrigLines:     0,
+		OrigStartLine: 0,
+	}
+	h := diff[0]
+	h.Body = nil // We're not testing the body.
+	if !reflect.DeepEqual(h, correct) {
+		t.Errorf("%s: Got %#v, want %#v", filename, h, correct)
+	}
+}
+
 func TestParseHunksAndPrintHunks(t *testing.T) {
 	tests := []struct {
 		filename     string
