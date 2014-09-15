@@ -355,8 +355,11 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				&r.hunk.OrigStartLine, &r.hunk.OrigLines,
 				&r.hunk.NewStartLine, &r.hunk.NewLines,
 			}
-			br := bytes.NewReader(line)
-			n, err := fmt.Fscanf(br, hunkHeader, items...)
+			header, section, err := normalizeHeader(string(line))
+			if err != nil {
+				return nil, &ParseError{r.line, r.offset, ErrBadHunkHeader}
+			}
+			n, err := fmt.Sscanf(header, hunkHeader, items...)
 			if err != nil {
 				return nil, err
 			}
@@ -364,10 +367,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return nil, &ParseError{r.line, r.offset, ErrBadHunkHeader}
 			}
 
-			// Any unread portion of the line is the (optional) section heading.
-			if br.Len() > 0 {
-				r.hunk.Section = string(bytes.TrimSpace(line[len(line)-br.Len():]))
-			}
+			r.hunk.Section = section
 		} else {
 			// Read hunk body line.
 			if bytes.HasPrefix(line, hunkPrefix) {
@@ -405,6 +405,46 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		return r.hunk, nil
 	}
 	return nil, io.EOF
+}
+
+// normalizeHeader takes a header of the form:
+// "@@ -linestart[,chunksize] +linestart[,chunksize] @@ section"
+// and returns two strings, with the first in the form:
+// "@@ -linestart,chunksize +linestart,chunksize @@".
+// where linestart and chunksize are both integers. The second is the
+// optional section header. chunksize may be omitted from the header
+// if its value is 1. normalizeHeader returns an error if the header
+// is not in the correct format.
+func normalizeHeader(header string) (string, string, error) {
+	err := fmt.Errorf("header in incorrect format: %s", header)
+	pieces := strings.Split(header, " ")
+	if len(pieces) < 4 {
+		return "", "", err
+	}
+
+	if pieces[0] != "@@" {
+		return "", "", err
+	}
+	for i := 1; i < 3; i++ {
+		if !strings.ContainsRune(pieces[i], ',') {
+			pieces[i] = pieces[i] + ",1"
+		}
+	}
+	if pieces[3] != "@@" {
+		return "", "", err
+	}
+
+	var section string
+	if len(pieces) > 4 {
+		delim := "@@"
+		s := strings.TrimPrefix(header, delim)
+		i := strings.Index(s, delim)
+		if i == -1 {
+			return "", "", err
+		}
+		section = s[i+len(delim):]
+	}
+	return strings.Join(pieces, " "), strings.TrimSpace(section), nil
 }
 
 // ReadAllHunks reads all remaining hunks from r. A successful call
