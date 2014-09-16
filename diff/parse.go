@@ -391,6 +391,13 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				// handle that case.
 				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
+			if string(line) == noNewlineMessage {
+				// Remove previous line's newline.
+				if len(r.hunk.Body) != 0 {
+					r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+				}
+				continue
+			}
 
 			r.hunk.Body = append(r.hunk.Body, line...)
 			r.hunk.Body = append(r.hunk.Body, '\n')
@@ -406,6 +413,8 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 	}
 	return nil, io.EOF
 }
+
+const noNewlineMessage = "\\ No newline at end of file\n"
 
 // linePrefixes is the set of all characters a valid line in a diff
 // hunk can start with. '\' can appear in diffs when no newline is
