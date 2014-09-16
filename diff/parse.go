@@ -384,12 +384,19 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return r.hunk, nil
 			}
 
-			if len(line) >= 1 && line[0] != ' ' && line[0] != '-' && line[0] != '+' {
+			if len(line) >= 1 && !linePrefix(line[0]) {
 				// Bad hunk header line. If we're reading a multi-file
 				// diff, this may be the end of the current
 				// file. Return a "rich" error that lets our caller
 				// handle that case.
 				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+			}
+			if string(line) == noNewlineMessage {
+				// Remove previous line's newline.
+				if len(r.hunk.Body) != 0 {
+					r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+				}
+				continue
 			}
 
 			r.hunk.Body = append(r.hunk.Body, line...)
@@ -405,6 +412,24 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		return r.hunk, nil
 	}
 	return nil, io.EOF
+}
+
+const noNewlineMessage = "\\ No newline at end of file\n"
+
+// linePrefixes is the set of all characters a valid line in a diff
+// hunk can start with. '\' can appear in diffs when no newline is
+// present at the end of a file.
+// See: 'http://www.gnu.org/software/diffutils/manual/diffutils.html#Incomplete-Lines'
+var linePrefixes = []byte{' ', '-', '+', '\\'}
+
+// linePrefix returns true if 'c' is in 'linePrefixes'.
+func linePrefix(c byte) bool {
+	for _, p := range linePrefixes {
+		if p == c {
+			return true
+		}
+	}
+	return false
 }
 
 // normalizeHeader takes a header of the form:
@@ -490,9 +515,9 @@ func (e *ErrBadHunkHeader) Error() string {
 	return "bad hunk header: " + e.header
 }
 
-// ErrBadHunkLine is when a line not beginning with ' ', '-', or '+'
-// is encountered while reading a hunk. In the context of reading a
-// single hunk or file, it is an unexpected error. In a multi-file
+// ErrBadHunkLine is when a line not beginning with ' ', '-', '+', or
+// '\' is encountered while reading a hunk. In the context of reading
+// a single hunk or file, it is an unexpected error. In a multi-file
 // diff, however, it indicates that the current file's diff is
 // complete (and remaining diff data will describe another file
 // unified diff).
@@ -500,4 +525,10 @@ type ErrBadHunkLine struct {
 	Line []byte
 }
 
-func (e *ErrBadHunkLine) Error() string { return "bad hunk line (does not start with ' ', '-', or '+')" }
+func (e *ErrBadHunkLine) Error() string {
+	m := "bad hunk line (does not start with ' ', '-', '+', or '\\')"
+	if len(e.Line) == 0 {
+		return m
+	}
+	return m + ": " + string(e.Line)
+}

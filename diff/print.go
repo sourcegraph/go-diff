@@ -86,6 +86,10 @@ func PrintHunks(hunks []*Hunk) ([]byte, error) {
 		if _, err := fmt.Fprintln(&buf); err != nil {
 			return nil, err
 		}
+		if len(hunk.Body) != 0 && hunk.Body[len(hunk.Body)-1] != '\n' {
+			// Append message if hunk.Body doesn't end with a newline.
+			hunk.Body = append(hunk.Body, noNewlineMessage...)
+		}
 		if _, err := buf.Write(hunk.Body); err != nil {
 			return nil, err
 		}

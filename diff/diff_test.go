@@ -50,6 +50,9 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 			filename:     "sample_bad_hunks.diff",
 			wantParseErr: nil,
 		},
+		{
+			filename: "sample_hunks_no_newline.diff",
+		},
 		{filename: "empty.diff"},
 	}
 	for _, test := range tests {
