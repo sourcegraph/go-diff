@@ -189,3 +189,63 @@ func TestNoNewlineAtEnd(t *testing.T) {
 		}
 	}
 }
+
+func TestFileDiff_Stat(t *testing.T) {
+	tests := map[string]struct {
+		hunks []*Hunk
+		want  Stat
+	}{
+		"no change": {
+			hunks: []*Hunk{
+				{Body: []byte(`@@ -0,0 +0,0
+ a
+ b
+`)},
+			},
+			want: Stat{},
+		},
+		"added/deleted": {
+			hunks: []*Hunk{
+				{Body: []byte(`@@ -0,0 +0,0
++a
+ b
+-c
+ d
+`)},
+			},
+			want: Stat{Added: 1, Deleted: 1},
+		},
+		"changed": {
+			hunks: []*Hunk{
+				{Body: []byte(`@@ -0,0 +0,0
++a
++b
+-c
+-d
+ e
+`)},
+			},
+			want: Stat{Added: 1, Changed: 1, Deleted: 1},
+		},
+		"many changes": {
+			hunks: []*Hunk{
+				{Body: []byte(`@@ -0,0 +0,0
++a
+-b
++c
+-d
+ e
+`)},
+			},
+			want: Stat{Added: 0, Changed: 2, Deleted: 0},
+		},
+	}
+	for label, test := range tests {
+		fdiff := &FileDiff{Hunks: test.hunks}
+		stat := fdiff.Stat()
+		if !reflect.DeepEqual(stat, test.want) {
+			t.Errorf("%s: got diff stat %+v, want %+v", label, stat, test.want)
+			continue
+		}
+	}
+}
