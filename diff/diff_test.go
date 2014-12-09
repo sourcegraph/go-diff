@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -54,7 +53,11 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{
 			filename: "sample_hunks_no_newline.diff",
 		},
+		{
+			filename: "sample_hunks_no_newline2.diff",
+		},
 		{filename: "empty.diff"},
+		{filename: "oneline_hunk.diff"},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
@@ -77,6 +80,25 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		if !bytes.Equal(printed, diffData) {
 			t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
 		}
+	}
+}
+
+func TestStripModifierLines(t *testing.T) {
+	orig := `- a
+\ No newline at end of file
++ b
+\ No newline at end of file
+`
+	want := `- a
++ b
+`
+
+	hunks := []*Hunk{{Body: []byte(orig)}}
+	StripModifierLines(hunks)
+	stripped := string(hunks[0].Body)
+
+	if stripped != want {
+		t.Errorf("Want:\n%s\nbut got:\n%s", want, stripped)
 	}
 }
 
@@ -156,36 +178,6 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		}
 		if !bytes.Equal(printed, diffData) {
 			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
-		}
-	}
-}
-
-func TestNoNewlineAtEnd(t *testing.T) {
-	orig := `@@ -1,1 +1,1 @@
--b
-+b
-\ No newline at end of file
-`
-
-	hunks, err := ParseHunks([]byte(orig))
-	if err != nil {
-		t.Fatal("ParseHunks: %s", err)
-	}
-
-	for _, hunk := range hunks {
-		if body := string(hunk.Body); strings.Contains(body, "No newline") {
-			t.Errorf("after parse, hunk body contains 'No newline...' string\n\nbody is:\n%q", body)
-		}
-		if bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
-			t.Errorf("after parse, hunk body ends with newline\n\nbody is:\n%q", hunk.Body)
-		}
-
-		printed, err := PrintHunks(hunks)
-		if err != nil {
-			t.Fatal("PrintHunks: %s", err)
-		}
-		if printed := string(printed); printed != orig {
-			t.Errorf("printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%q\n\n# Original:\n%q", printed, orig)
 		}
 	}
 }

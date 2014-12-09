@@ -89,17 +89,6 @@ func PrintHunks(hunks []*Hunk) ([]byte, error) {
 		if _, err := buf.Write(hunk.Body); err != nil {
 			return nil, err
 		}
-		if !bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
-			if _, err := fmt.Fprintln(&buf); err != nil {
-				return nil, err
-			}
-			if _, err := buf.Write([]byte(noNewlineMessage)); err != nil {
-				return nil, err
-			}
-			if _, err := fmt.Fprintln(&buf); err != nil {
-				return nil, err
-			}
-		}
 	}
 	return buf.Bytes(), nil
 }
