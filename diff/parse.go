@@ -324,6 +324,7 @@ type HunksReader struct {
 // returns error io.EOF.
 func (r *HunksReader) ReadHunk() (*Hunk, error) {
 	r.hunk = nil
+	lastLineFromOrig := true
 	var line []byte
 	for {
 		if r.nextHunkHeaderLine != nil {
@@ -392,11 +393,24 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
 			if bytes.Equal(line, []byte(noNewlineMessage)) {
-				// Remove previous line's newline.
-				if len(r.hunk.Body) != 0 {
-					r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+				if lastLineFromOrig {
+					// Retain the newline in the body (otherwise the
+					// diff line would be like "-a+b", where "+b" is
+					// the the next line of the new file, which is not
+					// validly formatted) but record that the orig had
+					// no newline.
+					r.hunk.OrigNoNewlineAt = len(r.hunk.Body)
+				} else {
+					// Remove previous line's newline.
+					if len(r.hunk.Body) != 0 {
+						r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+					}
 				}
 				continue
+			}
+
+			if len(line) > 0 {
+				lastLineFromOrig = line[0] == '-'
 			}
 
 			r.hunk.Body = append(r.hunk.Body, line...)

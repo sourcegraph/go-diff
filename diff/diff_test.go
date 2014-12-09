@@ -54,6 +54,13 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{
 			filename: "sample_hunks_no_newline.diff",
 		},
+		{filename: "no_newline_both.diff"},
+		{filename: "no_newline_both2.diff"},
+		{filename: "no_newline_orig.diff"},
+		{filename: "no_newline_new.diff"},
+		{filename: "empty_orig.diff"},
+		{filename: "empty_new.diff"},
+		{filename: "oneline_hunk.diff"},
 		{filename: "empty.diff"},
 	}
 	for _, test := range tests {
@@ -162,14 +169,14 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 
 func TestNoNewlineAtEnd(t *testing.T) {
 	orig := `@@ -1,1 +1,1 @@
--b
+-a
 +b
 \ No newline at end of file
 `
 
 	hunks, err := ParseHunks([]byte(orig))
 	if err != nil {
-		t.Fatal("ParseHunks: %s", err)
+		t.Fatalf("ParseHunks: %s", err)
 	}
 
 	for _, hunk := range hunks {
@@ -182,7 +189,7 @@ func TestNoNewlineAtEnd(t *testing.T) {
 
 		printed, err := PrintHunks(hunks)
 		if err != nil {
-			t.Fatal("PrintHunks: %s", err)
+			t.Fatalf("PrintHunks: %s", err)
 		}
 		if printed := string(printed); printed != orig {
 			t.Errorf("printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%q\n\n# Original:\n%q", printed, orig)

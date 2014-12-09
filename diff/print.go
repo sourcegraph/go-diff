@@ -86,20 +86,41 @@ func PrintHunks(hunks []*Hunk) ([]byte, error) {
 		if _, err := fmt.Fprintln(&buf); err != nil {
 			return nil, err
 		}
-		if _, err := buf.Write(hunk.Body); err != nil {
-			return nil, err
+
+		if hunk.OrigNoNewlineAt == 0 {
+			if _, err := buf.Write(hunk.Body); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := buf.Write(hunk.Body[:hunk.OrigNoNewlineAt]); err != nil {
+				return nil, err
+			}
+			if err := printNoNewlineMessage(&buf); err != nil {
+				return nil, err
+			}
+			if _, err := buf.Write(hunk.Body[hunk.OrigNoNewlineAt:]); err != nil {
+				return nil, err
+			}
 		}
+
 		if !bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
 			if _, err := fmt.Fprintln(&buf); err != nil {
 				return nil, err
 			}
-			if _, err := buf.Write([]byte(noNewlineMessage)); err != nil {
-				return nil, err
-			}
-			if _, err := fmt.Fprintln(&buf); err != nil {
+			if err := printNoNewlineMessage(&buf); err != nil {
 				return nil, err
 			}
 		}
 	}
 	return buf.Bytes(), nil
+}
+
+func printNoNewlineMessage(w io.Writer) error {
+	if _, err := w.Write([]byte(noNewlineMessage)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	return nil
 }

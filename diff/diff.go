@@ -36,8 +36,9 @@ func (d *FileDiff) Stat() Stat {
 // A Hunk represents a series of changes (additions or deletions) in a
 // file's unified diff.
 type Hunk struct {
-	OrigStartLine int // starting line number in original file
-	OrigLines     int // number of lines the hunk applies to in the original file
+	OrigStartLine   int // starting line number in original file
+	OrigLines       int // number of lines the hunk applies to in the original file
+	OrigNoNewlineAt int // if > 0, then the original file had a 'No newline at end of file' mark at this offset
 
 	NewStartLine int // starting line number in new file
 	NewLines     int // number of lines the hunk applies to in the new file
