@@ -168,31 +168,63 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 }
 
 func TestNoNewlineAtEnd(t *testing.T) {
-	orig := `@@ -1,1 +1,1 @@
+	diffs := map[string]struct {
+		diff              string
+		trailingNewlineOK bool
+	}{
+		"orig": {
+			diff: `@@ -1,1 +1,1 @@
+-a
+\ No newline at end of file
++b
+`,
+			trailingNewlineOK: true,
+		},
+		"new": {
+			diff: `@@ -1,1 +1,1 @@
 -a
 +b
 \ No newline at end of file
-`
-
-	hunks, err := ParseHunks([]byte(orig))
-	if err != nil {
-		t.Fatalf("ParseHunks: %s", err)
+`,
+		},
+		"both": {
+			diff: `@@ -1,1 +1,1 @@
+-a
+\ No newline at end of file
++b
+\ No newline at end of file
+`,
+		},
 	}
 
-	for _, hunk := range hunks {
-		if body := string(hunk.Body); strings.Contains(body, "No newline") {
-			t.Errorf("after parse, hunk body contains 'No newline...' string\n\nbody is:\n%q", body)
-		}
-		if bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
-			t.Errorf("after parse, hunk body ends with newline\n\nbody is:\n%q", hunk.Body)
+	for label, test := range diffs {
+		hunks, err := ParseHunks([]byte(test.diff))
+		if err != nil {
+			t.Errorf("%s: ParseHunks: %s", label, err)
+			continue
 		}
 
-		printed, err := PrintHunks(hunks)
-		if err != nil {
-			t.Fatalf("PrintHunks: %s", err)
-		}
-		if printed := string(printed); printed != orig {
-			t.Errorf("printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%q\n\n# Original:\n%q", printed, orig)
+		for _, hunk := range hunks {
+			if body := string(hunk.Body); strings.Contains(body, "No newline") {
+				t.Errorf("%s: after parse, hunk body contains 'No newline...' string\n\nbody is:\n%s", label, body)
+			}
+			if !test.trailingNewlineOK {
+				if bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
+					t.Errorf("%s: after parse, hunk body ends with newline\n\nbody is:\n%s", label, hunk.Body)
+				}
+			}
+			if dontWant := []byte("-a+b"); bytes.Contains(hunk.Body, dontWant) {
+				t.Errorf("%s: hunk body contains %q\n\nbody is:\n%s", label, dontWant, hunk.Body)
+			}
+
+			printed, err := PrintHunks(hunks)
+			if err != nil {
+				t.Errorf("%s: PrintHunks: %s", label, err)
+				continue
+			}
+			if printed := string(printed); printed != test.diff {
+				t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", label, printed, test.diff)
+			}
 		}
 	}
 }
