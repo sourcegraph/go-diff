@@ -304,15 +304,6 @@ func ParseHunks(diff []byte) ([]*Hunk, error) {
 	return hunks, nil
 }
 
-// StripModifierLines strips the modifier line "\ No newline at end of file", which
-// indicates that the preceding line has no terminating newline character. This makes it
-// so that all lines in the hunk corresponds to actual lines in the file.
-func StripModifierLines(hunks []*Hunk) {
-	for _, hunk := range hunks {
-		hunk.Body = bytes.Replace(hunk.Body, []byte(NoNewlineMessage+"\n"), []byte{}, -1)
-	}
-}
-
 // NewHunksReader returns a new HunksReader that reads unified diff hunks
 // from r.
 func NewHunksReader(r io.Reader) *HunksReader {
@@ -400,6 +391,13 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				// handle that case.
 				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
+			if bytes.Equal(line, []byte(noNewlineMessage)) {
+				// Remove previous line's newline.
+				if len(r.hunk.Body) != 0 {
+					r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+				}
+				continue
+			}
 
 			r.hunk.Body = append(r.hunk.Body, line...)
 			r.hunk.Body = append(r.hunk.Body, '\n')
@@ -416,7 +414,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 	return nil, io.EOF
 }
 
-const NoNewlineMessage = `\ No newline at end of file`
+const noNewlineMessage = `\ No newline at end of file`
 
 // linePrefixes is the set of all characters a valid line in a diff
 // hunk can start with. '\' can appear in diffs when no newline is
