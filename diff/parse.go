@@ -59,19 +59,38 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 		return nil, err
 	}
 
-	d.Hunks, err = fr.HunksReader().ReadAllHunks()
-	r.line = fr.line
-	r.offset = fr.offset
-	if err != nil {
-		if e0, ok := err.(*ParseError); ok {
-			if e, ok := e0.Err.(*ErrBadHunkLine); ok {
-				// This just means we finished reading the hunks for the
-				// current file. See the ErrBadHunkLine doc for more info.
-				r.nextFileFirstLine = e.Line
-				return d, nil
+	// Before reading hunks, check to see if there are any. If there
+	// aren't any, and there's another file after this file in the
+	// diff, then the hunks reader will complain ErrNoHunkHeader. It's
+	// not easy for us to tell from that error alone if that was
+	// caused by the lack of any hunks, or a malformatted hunk, so we
+	// need to perform the check here.
+	hr := fr.HunksReader()
+	ok := r.scanner.Scan()
+	if !ok {
+		return d, r.scanner.Err()
+	}
+	line := r.scanner.Bytes()
+	if bytes.HasPrefix(line, hunkPrefix) {
+		hr.nextHunkHeaderLine = line
+		d.Hunks, err = hr.ReadAllHunks()
+		r.line = fr.line
+		r.offset = fr.offset
+		if err != nil {
+			if e0, ok := err.(*ParseError); ok {
+				if e, ok := e0.Err.(*ErrBadHunkLine); ok {
+					// This just means we finished reading the hunks for the
+					// current file. See the ErrBadHunkLine doc for more info.
+					r.nextFileFirstLine = e.Line
+					return d, nil
+				}
 			}
+			return nil, err
 		}
-		return nil, err
+	} else {
+		// There weren't any hunks, so that line we peeked ahead at
+		// actually belongs to the next file. Put it back.
+		r.nextFileFirstLine = line
 	}
 
 	return d, nil
@@ -332,6 +351,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		if r.hunk == nil {
 			// Check for presence of hunk header.
 			if !bytes.HasPrefix(line, hunkPrefix) {
+				panic("X")
 				return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
 			}
 

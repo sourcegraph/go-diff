@@ -142,6 +142,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 			filename: "sample_multi_file_single.diff",
 		},
 		{filename: "empty.diff"},
+		{filename: "empty_multi.diff"},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
