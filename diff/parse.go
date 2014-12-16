@@ -492,13 +492,17 @@ func normalizeHeader(header string) (string, string, error) {
 // reported.
 func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 	var hunks []*Hunk
+	linesRead := 0
 	for {
 		hunk, err := r.ReadHunk()
 		if err == io.EOF {
 			return hunks, nil
 		}
 		if hunk != nil {
+			linesRead++ // account for the hunk header line
+			hunk.StartPosition = linesRead
 			hunks = append(hunks, hunk)
+			linesRead += bytes.Count(hunk.Body, []byte{'\n'})
 		}
 		if err != nil {
 			return hunks, err

@@ -45,6 +45,11 @@ type Hunk struct {
 
 	Section string // optional section heading
 
+	// 0-indexed line offset in unified file diff (including section headers);
+	// this is only set when Hunks are read from entire file diff (i.e., when ReadAllHunks is called)
+	// This accounts for hunk headers, too, so the StartPosition of the first hunk will be 1.
+	StartPosition int
+
 	Body []byte // hunk body (lines prefixed with '-', '+', or ' ')
 }
 
