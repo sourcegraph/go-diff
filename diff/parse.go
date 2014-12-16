@@ -264,21 +264,6 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 	}
 }
 
-func readRest(s *bufio.Scanner) string {
-	var lines []string
-	for {
-		ok := s.Scan()
-		if !ok {
-			break
-		}
-		if s.Err() != nil {
-			break
-		}
-		lines = append(lines, s.Text())
-	}
-	return strings.Join(lines, "\n")
-}
-
 var (
 	// ErrNoFileHeader is when a file unified diff has no file header
 	// (i.e., the lines that begin with "---" and "+++").
