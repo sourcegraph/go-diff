@@ -28,6 +28,7 @@ func TestParseHunkNoChunksize(t *testing.T) {
 		NewStartLine:  1,
 		OrigLines:     0,
 		OrigStartLine: 0,
+		StartPosition: 1,
 	}
 	h := diff[0]
 	h.Body = nil // We're not testing the body.
