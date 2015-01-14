@@ -25,7 +25,7 @@ func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
 // NewMultiFileDiffReader returns a new MultiFileDiffReader that reads
 // a multi-file unified diff from r.
 func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
-	return &MultiFileDiffReader{scanner: bufio.NewScanner(r)}
+	return &MultiFileDiffReader{reader: bufio.NewReader(r)}
 }
 
 // MultiFileDiffReader reads a multi-file unified diff.
@@ -33,7 +33,7 @@ type MultiFileDiffReader struct {
 	line    int
 	offset  int64
 	scanner *bufio.Scanner
-	// reader *bufio.Reader
+	reader  *bufio.Reader
 
 	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
 
@@ -52,7 +52,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	fr := &FileDiffReader{
 		line:           r.line,
 		offset:         r.offset,
-		scanner:        r.scanner,
+		reader:         r.reader,
 		fileHeaderLine: r.nextFileFirstLine,
 	}
 	r.nextFileFirstLine = nil
@@ -130,14 +130,14 @@ func ParseFileDiff(diff []byte) (*FileDiff, error) {
 // NewFileDiffReader returns a new FileDiffReader that reads a file
 // unified diff.
 func NewFileDiffReader(r io.Reader) *FileDiffReader {
-	return &FileDiffReader{scanner: bufio.NewScanner(r)}
+	return &FileDiffReader{reader: bufio.NewReader(r)}
 }
 
 // FileDiffReader reads a unified file diff.
 type FileDiffReader struct {
-	line    int
-	offset  int64
-	scanner *bufio.Scanner // TODO: change this to bufio.Reader
+	line   int
+	offset int64
+	reader *bufio.Reader
 
 	// fileHeaderLine is the first file header line, set by:
 	//
@@ -221,14 +221,22 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	var line []byte
 
 	if r.fileHeaderLine == nil {
-		ok := r.scanner.Scan()
-		if !ok {
+		var error
+		line, err = r.reader.ReadBytes('\n')
+		if err == io.EOF {
 			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
-		}
-		if err := r.scanner.Err(); err != nil {
+		} else if err != nil {
 			return "", nil, err
 		}
-		line = r.scanner.Bytes()
+
+		// ok := r.scanner.Scan()
+		// if !ok {
+		// 	return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
+		// }
+		// if err := r.scanner.Err(); err != nil {
+		// 	return "", nil, err
+		// }
+		// line = r.scanner.Bytes()
 	} else {
 		line = r.fileHeaderLine
 		r.fileHeaderLine = nil
@@ -266,6 +274,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 	for {
 		var line []byte
 		if r.fileHeaderLine == nil {
+			// TODO: START HERE: replace .Scan() with .ReadBytes() here and in any other locations
 			ok := r.scanner.Scan()
 			if !ok {
 				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
