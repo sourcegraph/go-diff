@@ -142,6 +142,9 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		{
 			filename: "sample_multi_file_single.diff",
 		},
+		{
+			filename: "long_line_multi.diff",
+		},
 		{filename: "empty.diff"},
 		{filename: "empty_multi.diff"},
 	}
@@ -168,6 +171,40 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		}
 	}
 }
+
+/*
+func TestParseMultiFileDiff_partialError(t *testing.T) {
+	tests := []struct {
+		filename    string
+		errors      []error
+		printedDiff string
+	}{{
+		filename:    "long_line_multi.diff",
+		errors:      nil,
+		printedDiff: ``,
+	}}
+
+	for _, test := range tests {
+		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		diff, err := ParseMultiFileDiff(diffData)
+		if err != nil {
+			t.Errorf("%s: got ParseMultiFileDiff err %v", test.filename, err)
+			continue
+		}
+
+		printed, err := PrintMultiFileDiff(diff)
+		if err != nil {
+			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
+		}
+		if !bytes.Equal(printed, []byte(test.printedDiff)) {
+			t.Errorf("%s: printed multi-file diff != expected multi-file diff\n\n# PrintMultiFileDiff output:\n%s\n\n# Expected:\n%s", test.filename, printed, test.printedDiff)
+		}
+	}
+}
+*/
 
 func TestNoNewlineAtEnd(t *testing.T) {
 	diffs := map[string]struct {

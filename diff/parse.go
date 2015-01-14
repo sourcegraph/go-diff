@@ -10,7 +10,14 @@ import (
 	"time"
 )
 
-// ParseMultiFileDiff parses a multi-file unified diff.
+// type MultiFileDiff struct {
+// 	Files []*FileDiff
+// 	Errs  []error
+// }
+
+// ParseMultiFileDiff parses a multi-file unified diff. It returns an error if parsing failed as a whole, but does its
+// best to parse as many files in the case of per-file errors. In the case of non-fatal per-file errors, the error
+// return value is null and the Errs field in the returned MultiFileDiff is set.
 func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
 	return NewMultiFileDiffReader(bytes.NewReader(diff)).ReadAllFiles()
 }
@@ -26,6 +33,7 @@ type MultiFileDiffReader struct {
 	line    int
 	offset  int64
 	scanner *bufio.Scanner
+	// reader *bufio.Reader
 
 	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
 
@@ -129,7 +137,7 @@ func NewFileDiffReader(r io.Reader) *FileDiffReader {
 type FileDiffReader struct {
 	line    int
 	offset  int64
-	scanner *bufio.Scanner
+	scanner *bufio.Scanner // TODO: change this to bufio.Reader
 
 	// fileHeaderLine is the first file header line, set by:
 	//
