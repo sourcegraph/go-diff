@@ -68,8 +68,8 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	// caused by the lack of any hunks, or a malformatted hunk, so we
 	// need to perform the check here.
 	hr := fr.HunksReader()
-	line, err := r.reader.ReadBytes('\n')
-	if err != nil && !(err == io.EOF && len(line) > 0) {
+	line, err := readLine(r.reader)
+	if err != nil {
 		return d, err
 	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
@@ -216,15 +216,12 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 
 	if r.fileHeaderLine == nil {
 		var err error
-		line, err = r.reader.ReadBytes('\n')
+		line, err = readLine(r.reader)
 		if err == io.EOF {
-			if len(line) == 0 {
-				return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
-			}
+			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
 			return "", nil, err
 		}
-		line = bytes.TrimSuffix(line, []byte{'\n'})
 	} else {
 		line = r.fileHeaderLine
 		r.fileHeaderLine = nil
@@ -263,15 +260,12 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 		var line []byte
 		if r.fileHeaderLine == nil {
 			var err error
-			line, err = r.reader.ReadBytes('\n')
+			line, err = readLine(r.reader)
 			if err == io.EOF {
-				if len(line) == 0 {
-					return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
-				}
+				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
 			} else if err != nil {
 				return xheaders, err
 			}
-			line = bytes.TrimSuffix(line, []byte{'\n'})
 		} else {
 			line = r.fileHeaderLine
 			r.fileHeaderLine = nil
@@ -344,14 +338,13 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			line = r.nextHunkHeaderLine
 			r.nextHunkHeaderLine = nil
 		} else {
-			line, err = r.reader.ReadBytes('\n')
+			line, err = readLine(r.reader)
 			if err != nil {
 				if err == io.EOF && r.hunk != nil {
 					return r.hunk, nil
 				}
 				return nil, err
 			}
-			line = bytes.TrimSuffix(line, []byte{'\n'})
 		}
 
 		// Record position.
