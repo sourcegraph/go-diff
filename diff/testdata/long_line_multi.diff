@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..6b8710a
 --- /dev/null
 +++ b/blah.txt
-@@ -0,0 +1 @@
+@@ -0,0 +1,1 @@
 +blah
 diff --git a/foo/bar.svg b/foo/bar.svg
 new file mode 100644
@@ -20,5 +20,5 @@ new file mode 100644
 index 0000000..6b8710a
 --- /dev/null
 +++ b/more.txt
-@@ -0,0 +1 @@
+@@ -0,0 +1,1 @@
 +more

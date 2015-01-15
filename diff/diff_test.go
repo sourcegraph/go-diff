@@ -20,7 +20,7 @@ func TestParseHunkNoChunksize(t *testing.T) {
 		t.Errorf("%s: got ParseHunks err %v,  want %v", filename, err, nil)
 	}
 	if len(diff) != 1 {
-		t.Errorf("%s: Got %d hunks, want only one", filename, len(diff))
+		t.Fatalf("%s: Got %d hunks, want only one", filename, len(diff))
 	}
 
 	correct := &Hunk{
@@ -141,6 +141,9 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		},
 		{
 			filename: "sample_multi_file_single.diff",
+		},
+		{
+			filename: "long_line_multi.diff",
 		},
 		{filename: "empty.diff"},
 		{filename: "empty_multi.diff"},
