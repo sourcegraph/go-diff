@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"sourcegraph.com/sqs/pbtypes"
 )
 
 // ParseMultiFileDiff parses a multi-file unified diff. It returns an error if parsing failed as a whole, but does its
@@ -172,9 +174,18 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 		return nil, err
 	}
 
-	fd.OrigName, fd.NewName, fd.OrigTime, fd.NewTime, err = r.ReadFileHeaders()
+	var origTime, newTime *time.Time
+	fd.OrigName, fd.NewName, origTime, newTime, err = r.ReadFileHeaders()
 	if err != nil {
 		return nil, err
+	}
+	if origTime != nil {
+		ts := pbtypes.NewTimestamp(*origTime)
+		fd.OrigTime = &ts
+	}
+	if newTime != nil {
+		ts := pbtypes.NewTimestamp(*newTime)
+		fd.NewTime = &ts
 	}
 
 	return fd, nil
