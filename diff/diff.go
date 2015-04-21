@@ -4,9 +4,7 @@ import "bytes"
 
 // NOTE: types are code-generated in diff.pb.go.
 
-//go:generate protoc -I../../../../github.com/gogo/protobuf/protobuf -I../../../../github.com/gogo/protobuf -I../../../../sourcegraph.com/sqs/pbtypes -I. --gogo_out=. diff.proto
-//go:generate sed -i "s#timestamp\\.pb#sourcegraph.com/sqs/pbtypes#g" diff.pb.go
-//go:generate sed -i "s#vcs\\.pb#sourcegraph.com/sourcegraph/go-vcs/vcs#g" diff.pb.go
+//go:generate protoc -I../../../.. -I ../../../../github.com/gogo/protobuf/protobuf -I. --gogo_out=. diff.proto
 
 // Stat computes the number of lines added/changed/deleted in all
 // hunks in this file's diff.

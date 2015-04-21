@@ -1,9 +1,8 @@
 syntax = "proto3";
 package diff;
 
-import "gogoproto/gogo.proto";
-import "timestamp.proto";
-
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "sourcegraph.com/sqs/pbtypes/timestamp.proto";
 
 // A FileDiff represents a unified diff for a single file.
 // 
