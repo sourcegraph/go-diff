@@ -73,22 +73,22 @@ func (m *FileDiff) GetHunks() []*Hunk {
 // unified diff.
 type Hunk struct {
 	// starting line number in original file
-	OrigStartLine int `protobuf:"varint,1,opt,name=orig_start_line,proto3,customtype=int" json:"orig_start_line,omitempty"`
+	OrigStartLine int32 `protobuf:"varint,1,opt,name=orig_start_line,proto3" json:"orig_start_line,omitempty"`
 	// number of lines the hunk applies to in the original file
-	OrigLines int `protobuf:"varint,2,opt,name=orig_lines,proto3,customtype=int" json:"orig_lines,omitempty"`
+	OrigLines int32 `protobuf:"varint,2,opt,name=orig_lines,proto3" json:"orig_lines,omitempty"`
 	// if > 0, then the original file had a 'No newline at end of file' mark at this offset
-	OrigNoNewlineAt int `protobuf:"varint,3,opt,name=orig_no_newline_at,proto3,customtype=int" json:"orig_no_newline_at,omitempty"`
+	OrigNoNewlineAt int32 `protobuf:"varint,3,opt,name=orig_no_newline_at,proto3" json:"orig_no_newline_at,omitempty"`
 	// starting line number in new file
-	NewStartLine int `protobuf:"varint,4,opt,name=new_start_line,proto3,customtype=int" json:"new_start_line,omitempty"`
+	NewStartLine int32 `protobuf:"varint,4,opt,name=new_start_line,proto3" json:"new_start_line,omitempty"`
 	// number of lines the hunk applies to in the new file
-	NewLines int `protobuf:"varint,5,opt,name=new_lines,proto3,customtype=int" json:"new_lines,omitempty"`
+	NewLines int32 `protobuf:"varint,5,opt,name=new_lines,proto3" json:"new_lines,omitempty"`
 	// optional section heading
 	Section string `protobuf:"bytes,6,opt,name=section,proto3" json:"section,omitempty"`
 	// 0-indexed line offset in unified file diff (including section headers); this is
 	// only set when Hunks are read from entire file diff (i.e., when ReadAllHunks is
 	// called) This accounts for hunk headers, too, so the StartPosition of the first
 	// hunk will be 1.
-	StartPosition int `protobuf:"varint,7,opt,name=start_position,proto3,customtype=int" json:"start_position,omitempty"`
+	StartPosition int32 `protobuf:"varint,7,opt,name=start_position,proto3" json:"start_position,omitempty"`
 	// hunk body (lines prefixed with '-', '+', or ' ')
 	Body []byte `protobuf:"bytes,8,opt,name=body,proto3" json:"body,omitempty"`
 }
@@ -100,11 +100,11 @@ func (*Hunk) ProtoMessage()    {}
 // A Stat is a diff stat that represents the number of lines added/changed/deleted.
 type Stat struct {
 	// number of lines added
-	Added int `protobuf:"varint,1,opt,name=added,proto3,customtype=int" json:"added,omitempty"`
+	Added int32 `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
 	// number of lines changed
-	Changed int `protobuf:"varint,2,opt,name=changed,proto3,customtype=int" json:"changed,omitempty"`
+	Changed int32 `protobuf:"varint,2,opt,name=changed,proto3" json:"changed,omitempty"`
 	// number of lines deleted
-	Deleted int `protobuf:"varint,3,opt,name=deleted,proto3,customtype=int" json:"deleted,omitempty"`
+	Deleted int32 `protobuf:"varint,3,opt,name=deleted,proto3" json:"deleted,omitempty"`
 }
 
 func (m *Stat) Reset()         { *m = Stat{} }

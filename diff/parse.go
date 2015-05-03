@@ -418,7 +418,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 					// the the next line of the new file, which is not
 					// validly formatted) but record that the orig had
 					// no newline.
-					r.hunk.OrigNoNewlineAt = len(r.hunk.Body)
+					r.hunk.OrigNoNewlineAt = int32(len(r.hunk.Body))
 				} else {
 					// Remove previous line's newline.
 					if len(r.hunk.Body) != 0 {
@@ -503,7 +503,7 @@ func normalizeHeader(header string) (string, string, error) {
 // reported.
 func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 	var hunks []*Hunk
-	linesRead := 0
+	linesRead := int32(0)
 	for {
 		hunk, err := r.ReadHunk()
 		if err == io.EOF {
@@ -513,7 +513,7 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 			linesRead++ // account for the hunk header line
 			hunk.StartPosition = linesRead
 			hunks = append(hunks, hunk)
-			linesRead += bytes.Count(hunk.Body, []byte{'\n'})
+			linesRead += int32(bytes.Count(hunk.Body, []byte{'\n'}))
 		}
 		if err != nil {
 			return hunks, err
