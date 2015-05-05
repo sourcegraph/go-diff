@@ -72,5 +72,8 @@ message Stat {
 
 	// number of lines deleted
 	int32 deleted = 3;
+
+	// number of bytes contained in body
+	int32 byte_size = 4;
 }
 

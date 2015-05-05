@@ -21,7 +21,7 @@ func (d *FileDiff) Stat() Stat {
 func (h *Hunk) Stat() Stat {
 	lines := bytes.Split(h.Body, []byte{'\n'})
 	var last byte
-	st := Stat{}
+	st := Stat{ByteSize: int32(len(h.Body))}
 	for _, line := range lines {
 		if len(line) == 0 {
 			last = 0
@@ -68,4 +68,5 @@ func (s *Stat) add(o Stat) {
 	s.Added += o.Added
 	s.Changed += o.Changed
 	s.Deleted += o.Deleted
+	s.ByteSize += o.ByteSize
 }
