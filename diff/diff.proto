@@ -65,15 +65,15 @@ message Hunk {
 // A Stat is a diff stat that represents the number of lines added/changed/deleted.
 message Stat {
 	// number of lines added
-	int32 added = 1;
+	int32 added = 1 [(gogoproto.jsontag) = ""];
 
 	// number of lines changed
-	int32 changed = 2;
+	int32 changed = 2 [(gogoproto.jsontag) = ""];
 
 	// number of lines deleted
-	int32 deleted = 3;
+	int32 deleted = 3 [(gogoproto.jsontag) = ""];
 
 	// number of bytes contained in body
-	int32 byte_size = 4;
+	int32 byte_size = 4 [(gogoproto.jsontag) = ""];
 }
 

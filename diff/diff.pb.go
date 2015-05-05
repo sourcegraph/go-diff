@@ -100,13 +100,13 @@ func (*Hunk) ProtoMessage()    {}
 // A Stat is a diff stat that represents the number of lines added/changed/deleted.
 type Stat struct {
 	// number of lines added
-	Added int32 `protobuf:"varint,1,opt,name=added,proto3" json:"added,omitempty"`
+	Added int32 `protobuf:"varint,1,opt,name=added,proto3" json:""`
 	// number of lines changed
-	Changed int32 `protobuf:"varint,2,opt,name=changed,proto3" json:"changed,omitempty"`
+	Changed int32 `protobuf:"varint,2,opt,name=changed,proto3" json:""`
 	// number of lines deleted
-	Deleted int32 `protobuf:"varint,3,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	Deleted int32 `protobuf:"varint,3,opt,name=deleted,proto3" json:""`
 	// number of bytes contained in body
-	ByteSize int32 `protobuf:"varint,4,opt,name=byte_size,proto3" json:"byte_size,omitempty"`
+	ByteSize int32 `protobuf:"varint,4,opt,name=byte_size,proto3" json:""`
 }
 
 func (m *Stat) Reset()         { *m = Stat{} }
