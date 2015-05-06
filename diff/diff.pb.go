@@ -105,8 +105,6 @@ type Stat struct {
 	Changed int32 `protobuf:"varint,2,opt,name=changed,proto3" json:""`
 	// number of lines deleted
 	Deleted int32 `protobuf:"varint,3,opt,name=deleted,proto3" json:""`
-	// number of bytes contained in body
-	ByteSize int32 `protobuf:"varint,4,opt,name=byte_size,proto3" json:""`
 }
 
 func (m *Stat) Reset()         { *m = Stat{} }
