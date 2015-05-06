@@ -246,7 +246,7 @@ func TestFileDiff_Stat(t *testing.T) {
  b
 `)},
 			},
-			want: Stat{ByteSize: 19},
+			want: Stat{},
 		},
 		"added/deleted": {
 			hunks: []*Hunk{
@@ -257,7 +257,7 @@ func TestFileDiff_Stat(t *testing.T) {
  d
 `)},
 			},
-			want: Stat{Added: 1, Deleted: 1, ByteSize: 25},
+			want: Stat{Added: 1, Deleted: 1},
 		},
 		"changed": {
 			hunks: []*Hunk{
@@ -269,7 +269,7 @@ func TestFileDiff_Stat(t *testing.T) {
  e
 `)},
 			},
-			want: Stat{Added: 1, Changed: 1, Deleted: 1, ByteSize: 28},
+			want: Stat{Added: 1, Changed: 1, Deleted: 1},
 		},
 		"many changes": {
 			hunks: []*Hunk{
@@ -281,7 +281,7 @@ func TestFileDiff_Stat(t *testing.T) {
  e
 `)},
 			},
-			want: Stat{Added: 0, Changed: 2, Deleted: 0, ByteSize: 28},
+			want: Stat{Added: 0, Changed: 2, Deleted: 0},
 		},
 	}
 	for label, test := range tests {

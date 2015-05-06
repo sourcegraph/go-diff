@@ -68,5 +68,4 @@ func (s *Stat) add(o Stat) {
 	s.Added += o.Added
 	s.Changed += o.Changed
 	s.Deleted += o.Deleted
-	s.ByteSize += o.ByteSize
 }

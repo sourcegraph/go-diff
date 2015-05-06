@@ -72,8 +72,5 @@ message Stat {
 
 	// number of lines deleted
 	int32 deleted = 3 [(gogoproto.jsontag) = ""];
-
-	// number of bytes contained in body
-	int32 byte_size = 4 [(gogoproto.jsontag) = ""];
 }
 
