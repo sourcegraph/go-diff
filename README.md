@@ -1,14 +1,20 @@
-# go-diff [![status](https://sourcegraph.com/api/repos/github.com/sourcegraph/go-diff/.badges/status.png)](https://sourcegraph.com/github.com/sourcegraph/go-diff) [![views](https://sourcegraph.com/api/repos/github.com/sourcegraph/go-diff/.counters/views.png)](https://sourcegraph.com/github.com/sourcegraph/go-diff)
+# go-diff [![Build Status](https://travis-ci.org/sourcegraph/go-diff.svg?branch=master)](https://travis-ci.org/sourcegraph/go-diff) [![status](https://sourcegraph.com/api/repos/sourcegraph.com/sourcegraph/go-diff/.badges/status.png)](https://sourcegraph.com/sourcegraph.com/sourcegraph/go-diff) [![views](https://sourcegraph.com/api/repos/sourcegraph.com/sourcegraph/go-diff/.counters/views.png)](https://sourcegraph.com/sourcegraph.com/sourcegraph/go-diff)
 
 Diff parser and printer for Go.
 
 **Unstable API:** go-diff is currently in development. If you depend on it, you should vendor it.
 
-It doesn't actually compute a diff. It only reads in (and prints out,
-given a Go struct representation) unified diff output, such as the
-following. The corresponding data structure in Go is the
-[diff.FileDiff](https://sourcegraph.com/github.com/sourcegraph/go-diff/.GoPackage/github.com/sourcegraph/go-diff/diff/.def/FileDiff)
-struct.
+Installing
+----------
+
+```bash
+go get -u sourcegraph.com/sourcegraph/go-diff/diff
+```
+
+Usage
+-----
+
+It doesn't actually compute a diff. It only reads in (and prints out, given a Go struct representation) unified diff output, such as the following. The corresponding data structure in Go is the [`diff.FileDiff`](https://sourcegraph.com/sourcegraph.com/sourcegraph/go-diff/.GoPackage/sourcegraph.com/sourcegraph/go-diff/diff/.def/FileDiff) struct.
 
 ```diff
 --- oldname	2009-10-11 15:12:20.000000000 -0700
