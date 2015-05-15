@@ -365,7 +365,6 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		if r.hunk == nil {
 			// Check for presence of hunk header.
 			if !bytes.HasPrefix(line, hunkPrefix) {
-				panic("X")
 				return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
 			}
 
@@ -436,12 +435,6 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			r.hunk.Body = append(r.hunk.Body, '\n')
 		}
 	}
-
-	// Final hunk is complete. But if we never saw a hunk in this call to ReadHunk, then it means we hit EOF.
-	if r.hunk != nil {
-		return r.hunk, nil
-	}
-	return nil, io.EOF
 }
 
 const noNewlineMessage = `\ No newline at end of file`
