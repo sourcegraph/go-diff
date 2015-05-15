@@ -13,6 +13,7 @@ install:
   - go get golang.org/x/tools/cmd/vet
 
 script:
+  - export TZ=US/Pacific # TODO: Fix this.
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d ./)
   - go tool vet ./
