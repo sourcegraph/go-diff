@@ -1,7 +1,7 @@
 diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go
 index aa4de15..7c048ab 100644
---- oldname	2009-10-11 15:12:20.000000000 -0700
-+++ newname	2009-10-11 15:12:30.000000000 -0700
+--- oldname	2009-10-11 15:12:20.000000000 +0000
++++ newname	2009-10-11 15:12:30.000000000 +0000
 @@ -1,3 +1,9 @@
 +This is an important
 +notice! It should

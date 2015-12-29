@@ -1,6 +1,6 @@
 diff --ruN a/oldname1 b/newname1
---- oldname1	2009-10-11 15:12:20.000000000 -0700
-+++ newname1	2009-10-11 15:12:30.000000000 -0700
+--- oldname1	2009-10-11 15:12:20.000000000 +0000
++++ newname1	2009-10-11 15:12:30.000000000 +0000
 @@ -1,3 +1,9 @@
 +This is an important
 +notice! It should

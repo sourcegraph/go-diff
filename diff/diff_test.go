@@ -7,7 +7,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
+
+func init() {
+	time.Local = time.UTC
+}
 
 func TestParseHunkNoChunksize(t *testing.T) {
 	filename := "sample_no_chunksize.diff"
