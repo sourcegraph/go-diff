@@ -11,6 +11,13 @@ import (
 )
 
 func init() {
+	// Diffs include times that by default are generated in the local
+	// timezone. To ensure that tests behave the same in all timezones
+	// (compared to the hard-coded expected output), force the test
+	// timezone to UTC.
+	//
+	// This is safe to do in tests but should not (and need not) be
+	// done for the main code.
 	time.Local = time.UTC
 }
 
