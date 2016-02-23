@@ -1,0 +1,27 @@
+diff --git a/README.md b/README.md
+index 5f3d591..96a24fa 100644
+--- a/README.md
++++ b/README.md
+@@ -24,6 +24,8 @@ and [view enterprise capabilities](https://www.example.com).*
+ 
+ ## Installation
+ 
++Minor change here.
++
+ Follow the 5-minute
+ [installation instructions](https://www.example.com/.docs/getting-started/). For
+ more installation methods, check out the
+diff --git a/docs/integrations/Email_Notifications.md b/docs/integrations/email-notifications.md
+similarity index 100%
+rename from docs/integrations/Email_Notifications.md
+rename to docs/integrations/email-notifications.md
+diff --git a/release_notes.md b/release_notes.md
+index f2ff13f..f060cb5 100644
+--- a/release_notes.md
++++ b/release_notes.md
+@@ -1,3 +1,5 @@
++# new section
++
+ # dev
+ 
+ - Removed example pages and the `--auth.example-flag`

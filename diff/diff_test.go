@@ -54,19 +54,10 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		filename     string
 		wantParseErr error
 	}{
-		{
-			filename: "sample_hunk.diff",
-		},
-		{
-			filename: "sample_hunks.diff",
-		},
-		{
-			filename:     "sample_bad_hunks.diff",
-			wantParseErr: nil,
-		},
-		{
-			filename: "sample_hunks_no_newline.diff",
-		},
+		{filename: "sample_hunk.diff"},
+		{filename: "sample_hunks.diff"},
+		{filename: "sample_bad_hunks.diff"},
+		{filename: "sample_hunks_no_newline.diff"},
 		{filename: "no_newline_both.diff"},
 		{filename: "no_newline_both2.diff"},
 		{filename: "no_newline_orig.diff"},
@@ -105,15 +96,9 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		filename     string
 		wantParseErr error
 	}{
-		{
-			filename: "sample_file.diff",
-		},
-		{
-			filename: "sample_file_no_timestamp.diff",
-		},
-		{
-			filename: "sample_file_extended.diff",
-		},
+		{filename: "sample_file.diff"},
+		{filename: "sample_file_no_timestamp.diff"},
+		{filename: "sample_file_extended.diff"},
 		{
 			filename:     "empty.diff",
 			wantParseErr: &ParseError{0, 0, ErrExtendedHeadersEOF},
@@ -145,20 +130,16 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 
 func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 	tests := []struct {
-		filename     string
-		wantParseErr error
+		filename      string
+		wantParseErr  error
+		wantFileDiffs int // How many instances of diff.FileDiff are expected.
 	}{
-		{
-			filename: "sample_multi_file.diff",
-		},
-		{
-			filename: "sample_multi_file_single.diff",
-		},
-		{
-			filename: "long_line_multi.diff",
-		},
-		{filename: "empty.diff"},
-		{filename: "empty_multi.diff"},
+		{filename: "sample_multi_file.diff", wantFileDiffs: 2},
+		{filename: "sample_multi_file_single.diff", wantFileDiffs: 1},
+		{filename: "sample_multi_file_rename.diff", wantFileDiffs: 3},
+		{filename: "long_line_multi.diff", wantFileDiffs: 3},
+		{filename: "empty.diff", wantFileDiffs: 0},
+		{filename: "empty_multi.diff", wantFileDiffs: 2},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
@@ -172,6 +153,10 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		}
 		if test.wantParseErr != nil {
 			continue
+		}
+
+		if got, want := len(diff), test.wantFileDiffs; got != want {
+			t.Errorf("%s: got %v instances of diff.FileDiff, expected %v", test.filename, got, want)
 		}
 
 		printed, err := PrintMultiFileDiff(diff)
