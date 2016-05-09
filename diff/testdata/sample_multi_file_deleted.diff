@@ -1,0 +1,27 @@
+diff --git a/vendor/go/build/syslist_test.go b/vendor/go/build/syslist_test.go
+deleted file mode 100644
+index 3be2928..0000000
+--- a/vendor/go/build/syslist_test.go
++++ /dev/null
+@@ -1,62 +0,0 @@
+-func TestGoodOSArch(t *testing.T) {
+-       for _, test := range tests {
+-               if Default.goodOSArchFile(test.name, make(map[string]bool)) != test.result {
+-                       t.Fatalf("goodOSArchFile(%q) != %v", test.name, test.result)
+-               }
+-       }
+-}
+diff --git a/vendor/go/build/testdata/empty/dummy b/vendor/go/build/testdata/empty/dummy
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/vendor/go/build/testdata/multi/file.go b/vendor/go/build/testdata/multi/file.go
+deleted file mode 100644
+index ee946eb..0000000
+--- a/vendor/go/build/testdata/multi/file.go
++++ /dev/null
+@@ -1,5 +0,0 @@
+-// Test data - not compiled.
+-
+-package main
+-
+-func main() {}

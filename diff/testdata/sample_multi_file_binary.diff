@@ -1,0 +1,29 @@
+diff --git a/README.md b/README.md
+index 7b73e04..36cde13 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,8 @@
+ Conception-go [![Build Status](https://travis-ci.org/shurcooL/Conception-go.svg?branch=master)](https://travis-ci.org/shurcooL/Conception-go)
+ =============
+
++This is a change.
++
+ This is a work in progress Go implementation of [Conception](https://github.com/shurcooL/Conception#demonstration).
+
+ Conception is an experimental project. It's a platform for researching software development tools and techniques. It is driven by a set of guiding principles. Conception-go targets Go development.
+diff --git a/data/Font.png b/data/Font.png
+index 17a971d..599f8dd 100644
+Binary files a/data/Font.png and b/data/Font.png differ
+diff --git a/main.go b/main.go
+index 1aced1e..98a982e 100644
+--- a/main.go
++++ b/main.go
+@@ -6710,6 +6710,8 @@ func init() {
+ }
+
+ func main() {
++	// Another plain text change.
++
+ 	//defer profile.Start(profile.CPUProfile).Stop()
+ 	//defer profile.Start(profile.MemProfile).Stop()
+

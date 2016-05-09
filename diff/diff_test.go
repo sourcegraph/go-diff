@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/shurcooL/go-goon"
+	"sourcegraph.com/sqs/pbtypes"
 )
 
 func init() {
@@ -91,6 +94,268 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 	}
 }
 
+func TestParseFileDiffHeaders(t *testing.T) {
+	tests := []struct {
+		filename string
+		wantDiff *FileDiff
+	}{
+		{
+			filename: "sample_file.diff",
+			wantDiff: &FileDiff{
+				OrigName: "oldname",
+				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				NewName:  "newname",
+				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+			},
+		},
+		{
+			filename: "sample_file_extended.diff",
+			wantDiff: &FileDiff{
+				OrigName: "oldname",
+				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				NewName:  "newname",
+				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+				Extended: []string{
+					"diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go",
+					"index aa4de15..7c048ab 100644",
+				},
+			},
+		},
+		{
+			filename: "sample_file_extended_empty_new.diff",
+			wantDiff: &FileDiff{
+				OrigName: "/dev/null",
+				OrigTime: nil,
+				NewName:  "b/vendor/go/build/testdata/empty/dummy",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/vendor/go/build/testdata/empty/dummy b/vendor/go/build/testdata/empty/dummy",
+					"new file mode 100644",
+					"index 0000000..e69de29",
+				},
+			},
+		},
+		{
+			filename: "sample_file_extended_empty_deleted.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/vendor/go/build/testdata/empty/dummy",
+				OrigTime: nil,
+				NewName:  "/dev/null",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/vendor/go/build/testdata/empty/dummy b/vendor/go/build/testdata/empty/dummy",
+					"deleted file mode 100644",
+					"index e69de29..0000000",
+				},
+			},
+		},
+		{
+			filename: "sample_file_extended_empty_rename.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/docs/integrations/Email_Notifications.md",
+				OrigTime: nil,
+				NewName:  "b/docs/integrations/email-notifications.md",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/docs/integrations/Email_Notifications.md b/docs/integrations/email-notifications.md",
+					"similarity index 100%",
+					"rename from docs/integrations/Email_Notifications.md",
+					"rename to docs/integrations/email-notifications.md",
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		diff, err := ParseFileDiff(diffData)
+		if err != nil {
+			t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
+		}
+
+		diff.Hunks = nil
+		if got, want := diff, test.wantDiff; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
+		}
+	}
+}
+
+func TestParseMultiFileDiffHeaders(t *testing.T) {
+	tests := []struct {
+		filename  string
+		wantDiffs []*FileDiff
+	}{
+		{
+			filename: "sample_multi_file_new.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/syslist_test.go",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/syslist_test.go b/_vendor/go/build/syslist_test.go",
+						"new file mode 100644",
+						"index 0000000..3be2928",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/testdata/empty/dummy",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/testdata/empty/dummy b/_vendor/go/build/testdata/empty/dummy",
+						"new file mode 100644",
+						"index 0000000..e69de29",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/testdata/multi/file.go",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/testdata/multi/file.go b/_vendor/go/build/testdata/multi/file.go",
+						"new file mode 100644",
+						"index 0000000..ee946eb",
+					},
+				},
+			},
+		},
+		{
+			filename: "sample_multi_file_deleted.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "a/vendor/go/build/syslist_test.go",
+					OrigTime: nil,
+					NewName:  "/dev/null",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/vendor/go/build/syslist_test.go b/vendor/go/build/syslist_test.go",
+						"deleted file mode 100644",
+						"index 3be2928..0000000",
+					},
+				},
+				{
+					OrigName: "a/vendor/go/build/testdata/empty/dummy",
+					OrigTime: nil,
+					NewName:  "/dev/null",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/vendor/go/build/testdata/empty/dummy b/vendor/go/build/testdata/empty/dummy",
+						"deleted file mode 100644",
+						"index e69de29..0000000",
+					},
+				},
+				{
+					OrigName: "a/vendor/go/build/testdata/multi/file.go",
+					OrigTime: nil,
+					NewName:  "/dev/null",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/vendor/go/build/testdata/multi/file.go b/vendor/go/build/testdata/multi/file.go",
+						"deleted file mode 100644",
+						"index ee946eb..0000000",
+					},
+				},
+			},
+		},
+		{
+			filename: "sample_multi_file_rename.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "a/README.md",
+					OrigTime: nil,
+					NewName:  "b/README.md",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/README.md b/README.md",
+						"index 5f3d591..96a24fa 100644",
+					},
+				},
+				{
+					OrigName: "a/docs/integrations/Email_Notifications.md",
+					OrigTime: nil,
+					NewName:  "b/docs/integrations/email-notifications.md",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/docs/integrations/Email_Notifications.md b/docs/integrations/email-notifications.md",
+						"similarity index 100%",
+						"rename from docs/integrations/Email_Notifications.md",
+						"rename to docs/integrations/email-notifications.md",
+					},
+				},
+				{
+					OrigName: "a/release_notes.md",
+					OrigTime: nil,
+					NewName:  "b/release_notes.md",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/release_notes.md b/release_notes.md",
+						"index f2ff13f..f060cb5 100644",
+					},
+				},
+			},
+		},
+		{
+			filename: "sample_multi_file_binary.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "a/README.md",
+					OrigTime: nil,
+					NewName:  "b/README.md",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/README.md b/README.md",
+						"index 7b73e04..36cde13 100644",
+					},
+				},
+				{
+					OrigName: "a/data/Font.png",
+					OrigTime: nil,
+					NewName:  "b/data/Font.png",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/data/Font.png b/data/Font.png",
+						"index 17a971d..599f8dd 100644",
+						"Binary files a/data/Font.png and b/data/Font.png differ",
+					},
+				},
+				{
+					OrigName: "a/main.go",
+					OrigTime: nil,
+					NewName:  "b/main.go",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/main.go b/main.go",
+						"index 1aced1e..98a982e 100644",
+					},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		diffs, err := ParseMultiFileDiff(diffData)
+		if err != nil {
+			t.Fatalf("%s: got ParseMultiFileDiff error %v", test.filename, err)
+		}
+
+		for i := range diffs {
+			diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
+		}
+		if got, want := diffs, test.wantDiffs; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
+		}
+	}
+}
+
 func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 	tests := []struct {
 		filename     string
@@ -99,6 +364,10 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		{filename: "sample_file.diff"},
 		{filename: "sample_file_no_timestamp.diff"},
 		{filename: "sample_file_extended.diff"},
+		{filename: "sample_file_extended_empty_new.diff"},
+		{filename: "sample_file_extended_empty_deleted.diff"},
+		{filename: "sample_file_extended_empty_rename.diff"},
+		{filename: "sample_file_extended_empty_binary.diff"},
 		{
 			filename:     "empty.diff",
 			wantParseErr: &ParseError{0, 0, ErrExtendedHeadersEOF},
@@ -136,7 +405,10 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 	}{
 		{filename: "sample_multi_file.diff", wantFileDiffs: 2},
 		{filename: "sample_multi_file_single.diff", wantFileDiffs: 1},
+		{filename: "sample_multi_file_new.diff", wantFileDiffs: 3},
+		{filename: "sample_multi_file_deleted.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_rename.diff", wantFileDiffs: 3},
+		{filename: "sample_multi_file_binary.diff", wantFileDiffs: 3},
 		{filename: "long_line_multi.diff", wantFileDiffs: 3},
 		{filename: "empty.diff", wantFileDiffs: 0},
 		{filename: "empty_multi.diff", wantFileDiffs: 2},
@@ -146,7 +418,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		diff, err := ParseMultiFileDiff(diffData)
+		diffs, err := ParseMultiFileDiff(diffData)
 		if err != test.wantParseErr {
 			t.Errorf("%s: got ParseMultiFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
 			continue
@@ -155,11 +427,11 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 			continue
 		}
 
-		if got, want := len(diff), test.wantFileDiffs; got != want {
+		if got, want := len(diffs), test.wantFileDiffs; got != want {
 			t.Errorf("%s: got %v instances of diff.FileDiff, expected %v", test.filename, got, want)
 		}
 
-		printed, err := PrintMultiFileDiff(diff)
+		printed, err := PrintMultiFileDiff(diffs)
 		if err != nil {
 			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
 		}
