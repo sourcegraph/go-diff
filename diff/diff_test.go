@@ -136,6 +136,21 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			},
 		},
 		{
+			filename: "sample_file_extended_empty_new_binary.diff",
+			wantDiff: &FileDiff{
+				OrigName: "/dev/null",
+				OrigTime: nil,
+				NewName:  "b/diff/binary-image.png",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/diff/binary-image.png b/diff/binary-image.png",
+					"new file mode 100644",
+					"index 0000000..b51756e",
+					"Binary files /dev/null and b/diff/binary-image.png differ",
+				},
+			},
+		},
+		{
 			filename: "sample_file_extended_empty_deleted.diff",
 			wantDiff: &FileDiff{
 				OrigName: "a/vendor/go/build/testdata/empty/dummy",
@@ -146,6 +161,21 @@ func TestParseFileDiffHeaders(t *testing.T) {
 					"diff --git a/vendor/go/build/testdata/empty/dummy b/vendor/go/build/testdata/empty/dummy",
 					"deleted file mode 100644",
 					"index e69de29..0000000",
+				},
+			},
+		},
+		{
+			filename: "sample_file_extended_empty_deleted_binary.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/187/player/random/gopher-0.png",
+				OrigTime: nil,
+				NewName:  "/dev/null",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/187/player/random/gopher-0.png b/187/player/random/gopher-0.png",
+					"deleted file mode 100644",
+					"index aebdfc7..0000000",
+					"Binary files a/187/player/random/gopher-0.png and /dev/null differ",
 				},
 			},
 		},
@@ -365,7 +395,9 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		{filename: "sample_file_no_timestamp.diff"},
 		{filename: "sample_file_extended.diff"},
 		{filename: "sample_file_extended_empty_new.diff"},
+		{filename: "sample_file_extended_empty_new_binary.diff"},
 		{filename: "sample_file_extended_empty_deleted.diff"},
+		{filename: "sample_file_extended_empty_deleted_binary.diff"},
 		{filename: "sample_file_extended_empty_rename.diff"},
 		{filename: "sample_file_extended_empty_binary.diff"},
 		{

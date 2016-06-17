@@ -329,12 +329,16 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 // that follow. It updates fd fields from the parsed extended headers.
 func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 	switch {
-	case len(fd.Extended) == 3 && strings.HasPrefix(fd.Extended[1], "new file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ")) &&
+		strings.HasPrefix(fd.Extended[1], "new file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName = "/dev/null"
 		fd.NewName = names[1]
 		return true
-	case len(fd.Extended) == 3 && strings.HasPrefix(fd.Extended[1], "deleted file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ")) &&
+		strings.HasPrefix(fd.Extended[1], "deleted file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName = names[0]
 		fd.NewName = "/dev/null"
