@@ -109,6 +109,15 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			},
 		},
 		{
+			filename: "sample_file_no_fractional_seconds.diff",
+			wantDiff: &FileDiff{
+				OrigName: "goyaml.go",
+				OrigTime: &pbtypes.Timestamp{Seconds: 1322164040},
+				NewName:  "goyaml.go",
+				NewTime:  &pbtypes.Timestamp{Seconds: 1322486679},
+			},
+		},
+		{
 			filename: "sample_file_extended.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",

@@ -71,7 +71,7 @@ func printFileHeader(w io.Writer, prefix string, filename string, timestamp *tim
 		return err
 	}
 	if timestamp != nil {
-		if _, err := fmt.Fprint(w, "\t", timestamp.Format(diffTimeFormat)); err != nil {
+		if _, err := fmt.Fprint(w, "\t", timestamp.Format(diffTimeFormatLayout)); err != nil {
 			return err
 		}
 	}
