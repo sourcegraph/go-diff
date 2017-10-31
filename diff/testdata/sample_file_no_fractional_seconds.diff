@@ -1,0 +1,11 @@
+--- goyaml.go	2011-11-24 19:47:20 +0000
++++ goyaml.go	2011-11-28 13:24:39 +0000
+@@ -256,7 +256,7 @@
+ 	switch v.Kind() {
+ 	case reflect.String:
+ 		return len(v.String()) == 0
+-	case reflect.Interface:
++	case reflect.Interface, reflect.Ptr:
+ 		return v.IsNil()
+ 	case reflect.Slice:
+ 		return v.Len() == 0

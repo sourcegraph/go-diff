@@ -267,7 +267,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	filename = parts[0]
 	if len(parts) == 2 {
 		// Timestamp is optional, but this header has it.
-		ts, err := time.Parse(diffTimeFormat, parts[1])
+		ts, err := time.Parse(diffTimeParseLayout, parts[1])
 		if err != nil {
 			return "", nil, err
 		}

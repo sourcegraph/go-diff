@@ -59,10 +59,15 @@ var (
 
 const hunkHeader = "@@ -%d,%d +%d,%d @@"
 
-// diffTimeFormat is the time format string for unified diff file
-// header timestamps. See
-// http://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html.
-const diffTimeFormat = "2006-01-02 15:04:05.000000000 -0700"
+// diffTimeParseLayout is the layout used to parse the time in unified diff file
+// header timestamps.
+// See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html.
+const diffTimeParseLayout = "2006-01-02 15:04:05 -0700"
+
+// diffTimeFormatLayout is the layout used to format (i.e., print) the time in unified diff file
+// header timestamps.
+// See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html.
+const diffTimeFormatLayout = "2006-01-02 15:04:05.000000000 -0700"
 
 func (s *Stat) add(o Stat) {
 	s.Added += o.Added
