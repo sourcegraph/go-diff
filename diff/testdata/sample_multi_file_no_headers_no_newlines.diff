@@ -1,0 +1,14 @@
+--- a.txt       2018-09-30 15:46:20.619045746 -0400
++++ a.mod.txt   2018-09-30 15:46:26.935180502 -0400
+@@ -1,1 +1,1 @@
+-Hello World
+\ No newline at end of file
++Goodbye World
+\ No newline at end of file
+--- b.txt       2018-09-30 15:46:20.619045746 -0400
++++ b.mod.txt   2018-09-30 15:46:26.935180502 -0400
+@@ -1,1 +1,1 @@
+-Hello World
+\ No newline at end of file
++Goodbye World
+\ No newline at end of file

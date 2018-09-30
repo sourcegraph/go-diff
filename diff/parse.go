@@ -393,7 +393,6 @@ func NewHunksReader(r io.Reader) *HunksReader {
 type HunksReader struct {
 	line   int
 	offset int64
-	hunk   *Hunk
 	reader *bufio.Reader
 
 	nextHunkHeaderLine []byte
@@ -402,10 +401,11 @@ type HunksReader struct {
 // ReadHunk reads one hunk from r. If there are no more hunks, it
 // returns error io.EOF.
 func (r *HunksReader) ReadHunk() (*Hunk, error) {
-	r.hunk = nil
-	lastLineFromOrig := true
+	var hunk *Hunk
 	var line []byte
 	var err error
+	var origLinesRemaining, newLinesRemaining int32
+	lastLineFromOrig := true
 	for {
 		if r.nextHunkHeaderLine != nil {
 			// Use stored hunk header line that was scanned in at the
@@ -415,8 +415,8 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		} else {
 			line, err = readLine(r.reader)
 			if err != nil {
-				if err == io.EOF && r.hunk != nil {
-					return r.hunk, nil
+				if err == io.EOF && hunk != nil {
+					return hunk, nil
 				}
 				return nil, err
 			}
@@ -426,17 +426,17 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		r.line++
 		r.offset += int64(len(line))
 
-		if r.hunk == nil {
+		if hunk == nil {
 			// Check for presence of hunk header.
 			if !bytes.HasPrefix(line, hunkPrefix) {
 				return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
 			}
 
 			// Parse hunk header.
-			r.hunk = &Hunk{}
+			hunk = &Hunk{}
 			items := []interface{}{
-				&r.hunk.OrigStartLine, &r.hunk.OrigLines,
-				&r.hunk.NewStartLine, &r.hunk.NewLines,
+				&hunk.OrigStartLine, &hunk.OrigLines,
+				&hunk.NewStartLine, &hunk.NewLines,
 			}
 			header, section, err := normalizeHeader(string(line))
 			if err != nil {
@@ -450,30 +450,30 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
 			}
 
-			r.hunk.Section = section
+			hunk.Section = section
+			origLinesRemaining = hunk.OrigLines
+			newLinesRemaining = hunk.NewLines
 		} else {
-			// Read hunk body line.
-			if bytes.HasPrefix(line, hunkPrefix) {
-				// Saw start of new hunk, so this hunk is
-				// complete. But we've already read in the next hunk's
-				// header, so we need to be sure that the next call to
-				// ReadHunk starts with that header.
-				r.nextHunkHeaderLine = line
-
-				// Rewind position.
+			// Check if there are no more diff or context lines to read.
+			// "No newline" messages don't count toward the line count.
+			if origLinesRemaining == 0 && newLinesRemaining == 0 && !bytes.Equal(line, []byte(noNewlineMessage)) {
+				// We've read into something that's no longer our hunk, rewind
 				r.line--
 				r.offset -= int64(len(line))
 
-				return r.hunk, nil
+				// If the next thing is a hunk, we'll catch it on the next call. If
+				// it's something else, return a ErrBadHunkLine so the caller can
+				// determine what to do about it. If we're reading multiple files,
+				// this is expected. If we're not, then the error will be bubbled
+				// up.
+				if bytes.HasPrefix(line, hunkPrefix) {
+					r.nextHunkHeaderLine = line
+					return hunk, nil
+				}
+
+				return hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
 
-			if len(line) >= 1 && !linePrefix(line[0]) {
-				// Bad hunk header line. If we're reading a multi-file
-				// diff, this may be the end of the current
-				// file. Return a "rich" error that lets our caller
-				// handle that case.
-				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
-			}
 			if bytes.Equal(line, []byte(noNewlineMessage)) {
 				if lastLineFromOrig {
 					// Retain the newline in the body (otherwise the
@@ -481,43 +481,42 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 					// the the next line of the new file, which is not
 					// validly formatted) but record that the orig had
 					// no newline.
-					r.hunk.OrigNoNewlineAt = int32(len(r.hunk.Body))
+					hunk.OrigNoNewlineAt = int32(len(hunk.Body))
 				} else {
 					// Remove previous line's newline.
-					if len(r.hunk.Body) != 0 {
-						r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
+					if len(hunk.Body) != 0 {
+						hunk.Body = hunk.Body[:len(hunk.Body)-1]
 					}
 				}
+
 				continue
 			}
 
-			if len(line) > 0 {
-				lastLineFromOrig = line[0] == '-'
+			if len(line) >= 1 {
+				switch line[0] {
+				case '-':
+					lastLineFromOrig = true
+					origLinesRemaining--
+				case '+':
+					lastLineFromOrig = false
+					newLinesRemaining--
+				case ' ': // context
+					origLinesRemaining--
+					newLinesRemaining--
+				case '\\':
+					// incomplete line
+				default:
+					return hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+				}
 			}
 
-			r.hunk.Body = append(r.hunk.Body, line...)
-			r.hunk.Body = append(r.hunk.Body, '\n')
+			hunk.Body = append(hunk.Body, line...)
+			hunk.Body = append(hunk.Body, '\n')
 		}
 	}
 }
 
 const noNewlineMessage = `\ No newline at end of file`
-
-// linePrefixes is the set of all characters a valid line in a diff
-// hunk can start with. '\' can appear in diffs when no newline is
-// present at the end of a file.
-// See: 'http://www.gnu.org/software/diffutils/manual/diffutils.html#Incomplete-Lines'
-var linePrefixes = []byte{' ', '-', '+', '\\'}
-
-// linePrefix returns true if 'c' is in 'linePrefixes'.
-func linePrefix(c byte) bool {
-	for _, p := range linePrefixes {
-		if p == c {
-			return true
-		}
-	}
-	return false
-}
 
 // normalizeHeader takes a header of the form:
 // "@@ -linestart[,chunksize] +linestart[,chunksize] @@ section"

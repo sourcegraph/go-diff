@@ -59,7 +59,14 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 	}{
 		{filename: "sample_hunk.diff"},
 		{filename: "sample_hunks.diff"},
-		{filename: "sample_bad_hunks.diff"},
+		{
+			filename: "sample_bad_hunks.diff",
+			wantParseErr: &ParseError{
+				Line:   30,
+				Offset: 556,
+				Err:    &ErrBadHunkLine{Line: []byte("@@ -22,3 +22,7 @@")},
+			},
+		},
 		{filename: "sample_hunks_no_newline.diff"},
 		{filename: "no_newline_both.diff"},
 		{filename: "no_newline_both2.diff"},
@@ -71,26 +78,28 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{filename: "empty.diff"},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diff, err := ParseHunks(diffData)
-		if err != test.wantParseErr {
-			t.Errorf("%s: got ParseHunks err %v, want %v", test.filename, err, test.wantParseErr)
-			continue
-		}
-		if test.wantParseErr != nil {
-			continue
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff, err := ParseHunks(diffData)
+			if !reflect.DeepEqual(err, test.wantParseErr) {
+				t.Errorf("got ParseHunks err %v, want %v", err, test.wantParseErr)
+				return
+			}
+			if test.wantParseErr != nil {
+				return
+			}
 
-		printed, err := PrintHunks(diff)
-		if err != nil {
-			t.Errorf("%s: PrintHunks: %s", test.filename, err)
-		}
-		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
-		}
+			printed, err := PrintHunks(diff)
+			if err != nil {
+				t.Errorf("PrintHunks: %s", err)
+			}
+			if !bytes.Equal(printed, diffData) {
+				t.Errorf("printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", printed, diffData)
+			}
+		})
 	}
 }
 
@@ -205,19 +214,21 @@ func TestParseFileDiffHeaders(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diff, err := ParseFileDiff(diffData)
-		if err != nil {
-			t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff, err := ParseFileDiff(diffData)
+			if err != nil {
+				t.Fatalf("got ParseFileDiff error %v", err)
+			}
 
-		diff.Hunks = nil
-		if got, want := diff, test.wantDiff; !reflect.DeepEqual(got, want) {
-			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
-		}
+			diff.Hunks = nil
+			if got, want := diff, test.wantDiff; !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %v\nwant: %v", goon.Sdump(got), goon.Sdump(want))
+			}
+		})
 	}
 }
 
@@ -377,21 +388,23 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diffs, err := ParseMultiFileDiff(diffData)
-		if err != nil {
-			t.Fatalf("%s: got ParseMultiFileDiff error %v", test.filename, err)
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diffs, err := ParseMultiFileDiff(diffData)
+			if err != nil {
+				t.Fatalf("got ParseMultiFileDiff error %v", err)
+			}
 
-		for i := range diffs {
-			diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
-		}
-		if got, want := diffs, test.wantDiffs; !reflect.DeepEqual(got, want) {
-			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
-		}
+			for i := range diffs {
+				diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
+			}
+			if got, want := diffs, test.wantDiffs; !reflect.DeepEqual(got, want) {
+				t.Errorf("got: %v\nwant: %v", goon.Sdump(got), goon.Sdump(want))
+			}
+		})
 	}
 }
 
@@ -415,26 +428,28 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diff, err := ParseFileDiff(diffData)
-		if !reflect.DeepEqual(err, test.wantParseErr) {
-			t.Errorf("%s: got ParseFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
-			continue
-		}
-		if test.wantParseErr != nil {
-			continue
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff, err := ParseFileDiff(diffData)
+			if !reflect.DeepEqual(err, test.wantParseErr) {
+				t.Errorf("got ParseFileDiff err %v, want %v", err, test.wantParseErr)
+				return
+			}
+			if test.wantParseErr != nil {
+				return
+			}
 
-		printed, err := PrintFileDiff(diff)
-		if err != nil {
-			t.Errorf("%s: PrintFileDiff: %s", test.filename, err)
-		}
-		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed file diff != original file diff\n\n# PrintFileDiff output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
-		}
+			printed, err := PrintFileDiff(diff)
+			if err != nil {
+				t.Errorf("PrintFileDiff: %s", err)
+			}
+			if !bytes.Equal(printed, diffData) {
+				t.Errorf("printed file diff != original file diff\n\n# PrintFileDiff output:\n%s\n\n# Original:\n%s", printed, diffData)
+			}
+		})
 	}
 }
 
@@ -450,35 +465,39 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		{filename: "sample_multi_file_deleted.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_rename.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_binary.diff", wantFileDiffs: 3},
+		{filename: "sample_multi_file_no_headers.diff", wantFileDiffs: 2},
+		{filename: "sample_multi_file_no_headers_no_newlines.diff", wantFileDiffs: 2},
+		{filename: "sample_multi_file_ambiguous_lines.diff", wantFileDiffs: 2},
 		{filename: "long_line_multi.diff", wantFileDiffs: 3},
 		{filename: "empty.diff", wantFileDiffs: 0},
 		{filename: "empty_multi.diff", wantFileDiffs: 2},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diffs, err := ParseMultiFileDiff(diffData)
-		if err != test.wantParseErr {
-			t.Errorf("%s: got ParseMultiFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
-			continue
-		}
-		if test.wantParseErr != nil {
-			continue
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diffs, err := ParseMultiFileDiff(diffData)
+			if err != test.wantParseErr {
+				t.Fatalf("got ParseMultiFileDiff err %v, want %v", err, test.wantParseErr)
+			}
+			if test.wantParseErr != nil {
+				return
+			}
 
-		if got, want := len(diffs), test.wantFileDiffs; got != want {
-			t.Errorf("%s: got %v instances of diff.FileDiff, expected %v", test.filename, got, want)
-		}
+			if got, want := len(diffs), test.wantFileDiffs; got != want {
+				t.Errorf("got %v instances of diff.FileDiff, expected %v", got, want)
+			}
 
-		printed, err := PrintMultiFileDiff(diffs)
-		if err != nil {
-			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
-		}
-		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
-		}
+			printed, err := PrintMultiFileDiff(diffs)
+			if err != nil {
+				t.Errorf("PrintMultiFileDiff: %s", err)
+			}
+			if !bytes.Equal(printed, diffData) {
+				t.Errorf("printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output:\n%s\n\n# Original:\n%s", printed, diffData)
+			}
+		})
 	}
 }
 
@@ -513,34 +532,36 @@ func TestNoNewlineAtEnd(t *testing.T) {
 	}
 
 	for label, test := range diffs {
-		hunks, err := ParseHunks([]byte(test.diff))
-		if err != nil {
-			t.Errorf("%s: ParseHunks: %s", label, err)
-			continue
-		}
-
-		for _, hunk := range hunks {
-			if body := string(hunk.Body); strings.Contains(body, "No newline") {
-				t.Errorf("%s: after parse, hunk body contains 'No newline...' string\n\nbody is:\n%s", label, body)
+		t.Run(label, func(t *testing.T) {
+			hunks, err := ParseHunks([]byte(test.diff))
+			if err != nil {
+				t.Errorf("ParseHunks: %s", err)
+				return
 			}
-			if !test.trailingNewlineOK {
-				if bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
-					t.Errorf("%s: after parse, hunk body ends with newline\n\nbody is:\n%s", label, hunk.Body)
+
+			for _, hunk := range hunks {
+				if body := string(hunk.Body); strings.Contains(body, "No newline") {
+					t.Errorf("after parse, hunk body contains 'No newline...' string\n\nbody is:\n%s", body)
+				}
+				if !test.trailingNewlineOK {
+					if bytes.HasSuffix(hunk.Body, []byte{'\n'}) {
+						t.Errorf("after parse, hunk body ends with newline\n\nbody is:\n%s", hunk.Body)
+					}
+				}
+				if dontWant := []byte("-a+b"); bytes.Contains(hunk.Body, dontWant) {
+					t.Errorf("hunk body contains %q\n\nbody is:\n%s", dontWant, hunk.Body)
+				}
+
+				printed, err := PrintHunks(hunks)
+				if err != nil {
+					t.Errorf("PrintHunks: %s", err)
+					continue
+				}
+				if printed := string(printed); printed != test.diff {
+					t.Errorf("printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", printed, test.diff)
 				}
 			}
-			if dontWant := []byte("-a+b"); bytes.Contains(hunk.Body, dontWant) {
-				t.Errorf("%s: hunk body contains %q\n\nbody is:\n%s", label, dontWant, hunk.Body)
-			}
-
-			printed, err := PrintHunks(hunks)
-			if err != nil {
-				t.Errorf("%s: PrintHunks: %s", label, err)
-				continue
-			}
-			if printed := string(printed); printed != test.diff {
-				t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", label, printed, test.diff)
-			}
-		}
+		})
 	}
 }
 
@@ -595,11 +616,12 @@ func TestFileDiff_Stat(t *testing.T) {
 		},
 	}
 	for label, test := range tests {
-		fdiff := &FileDiff{Hunks: test.hunks}
-		stat := fdiff.Stat()
-		if !reflect.DeepEqual(stat, test.want) {
-			t.Errorf("%s: got diff stat %+v, want %+v", label, stat, test.want)
-			continue
-		}
+		t.Run(label, func(t *testing.T) {
+			fdiff := &FileDiff{Hunks: test.hunks}
+			stat := fdiff.Stat()
+			if !reflect.DeepEqual(stat, test.want) {
+				t.Errorf("got diff stat %+v, want %+v", stat, test.want)
+			}
+		})
 	}
 }
