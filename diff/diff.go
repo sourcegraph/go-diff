@@ -2,7 +2,7 @@ package diff
 
 import "bytes"
 
-// NOTE: types are code-generated in diff.pb.go.
+//IMPORTANT NOTE: types are code-generated in diff.pb.go.
 
 //go:generate protoc -I../../../.. -I ../../../../github.com/gogo/protobuf/protobuf -I. --gogo_out=. diff.proto
 
