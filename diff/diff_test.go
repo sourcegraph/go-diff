@@ -375,6 +375,44 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "sample_multi_file_new_win.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/syslist_test.go",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/syslist_test.go b/_vendor/go/build/syslist_test.go",
+						"new file mode 100644",
+						"index 0000000..3be2928",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/testdata/empty/dummy",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/testdata/empty/dummy b/_vendor/go/build/testdata/empty/dummy",
+						"new file mode 100644",
+						"index 0000000..e69de29",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					OrigTime: nil,
+					NewName:  "b/_vendor/go/build/testdata/multi/file.go",
+					NewTime:  nil,
+					Extended: []string{
+						"diff --git a/_vendor/go/build/testdata/multi/file.go b/_vendor/go/build/testdata/multi/file.go",
+						"new file mode 100644",
+						"index 0000000..ee946eb",
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
