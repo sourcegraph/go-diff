@@ -4,13 +4,25 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	"sourcegraph.com/sqs/pbtypes"
 )
 
-// PrintMultiFileDiff prints a multi-file diff in unified diff format.
-func PrintMultiFileDiff(ds []*FileDiff) ([]byte, error) {
+// PrintOptions specifies how to print a diff.
+type PrintOptions struct {
+	Sort bool // sort by filename
+}
+
+// PrintMultiFileDiff prints a multi-file diff in unified diff format with the specified options.
+func PrintMultiFileDiff(ds []*FileDiff, opt *PrintOptions) ([]byte, error) {
+	if opt != nil && opt.Sort {
+		sort.Slice(ds, func(i, j int) bool {
+			return ds[i].NewName < ds[j].NewName
+		})
+	}
+
 	var buf bytes.Buffer
 	for _, d := range ds {
 		diff, err := PrintFileDiff(d)
