@@ -1,4 +1,4 @@
-module sourcegraph.com/sourcegraph/go-diff
+module github.com/sourcegraph/go-diff
 
 require (
 	github.com/gogo/protobuf v1.1.1

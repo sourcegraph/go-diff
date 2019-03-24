@@ -1,22 +1,10 @@
 sudo: false
 language: go
 go:
-  - "1.10.x"
-  - "1.x"
-  - "tip"
-matrix:
-  allow_failures:
-    - go: tip
-  fast_finish: true
-before_install:
-  - mkdir -p $HOME/gopath/src/sourcegraph.com/sourcegraph
-  - mv $TRAVIS_BUILD_DIR $HOME/gopath/src/sourcegraph.com/sourcegraph/go-diff
-  - export TRAVIS_BUILD_DIR=$HOME/gopath/src/sourcegraph.com/sourcegraph/go-diff
-  - cd $TRAVIS_BUILD_DIR
-install:
-  - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
+  - "1.12.x"
 script:
   - GO111MODULE=on go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d -s .)
-  - GO111MODULE=on go tool vet .
-  - GO111MODULE=on go test -v -race ./...
+  - GO111MODULE=on go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
