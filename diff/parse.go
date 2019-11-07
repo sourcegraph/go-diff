@@ -12,9 +12,10 @@ import (
 	"sourcegraph.com/sqs/pbtypes"
 )
 
-// ParseMultiFileDiff parses a multi-file unified diff. It returns an error if parsing failed as a whole, but does its
-// best to parse as many files in the case of per-file errors. In the case of non-fatal per-file errors, the error
-// return value is null and the Errs field in the returned MultiFileDiff is set.
+// ParseMultiFileDiff parses a multi-file unified diff. It returns an error if
+// parsing failed as a whole, but does its best to parse as many files in the
+// case of per-file errors. If it cannot detect when the diff of the next file
+// begins, the hunks are added to the FileDiff of the previous file.
 func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
 	return NewMultiFileDiffReader(bytes.NewReader(diff)).ReadAllFiles()
 }
