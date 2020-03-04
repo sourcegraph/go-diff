@@ -1,5 +1,7 @@
 module github.com/sourcegraph/go-diff
 
+go 1.14
+
 require (
 	github.com/gogo/protobuf v1.1.1
 	github.com/shurcooL/go v0.0.0-20180423040247-9e1955d9fb6e // indirect
