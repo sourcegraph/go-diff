@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -234,6 +235,15 @@ func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimest
 		return "", "", nil, nil, err
 	}
 
+	unquotedOrigName, err := strconv.Unquote(origName)
+	if err == nil {
+		origName = unquotedOrigName
+	}
+	unquotedNewName, err := strconv.Unquote(newName)
+	if err == nil {
+		newName = unquotedNewName
+	}
+
 	return origName, newName, origTimestamp, newTimestamp, nil
 }
 
@@ -329,30 +339,49 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 // handleEmpty detects when FileDiff was an empty diff and will not have any hunks
 // that follow. It updates fd fields from the parsed extended headers.
 func handleEmpty(fd *FileDiff) (wasEmpty bool) {
+	var err error
 	switch {
 	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ")) &&
 		strings.HasPrefix(fd.Extended[1], "new file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
 
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName = "/dev/null"
-		fd.NewName = names[1]
+		fd.NewName, err = strconv.Unquote(names[1])
+		if err != nil {
+			fd.NewName = names[1]
+		}
 		return true
 	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ")) &&
 		strings.HasPrefix(fd.Extended[1], "deleted file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
 
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName = names[0]
+		fd.OrigName, err = strconv.Unquote(names[0])
+		if err != nil {
+			fd.OrigName = names[0]
+		}
 		fd.NewName = "/dev/null"
 		return true
 	case len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[2], "rename from ") && strings.HasPrefix(fd.Extended[3], "rename to ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName = names[0]
-		fd.NewName = names[1]
+		fd.OrigName, err = strconv.Unquote(names[0])
+		if err != nil {
+			fd.OrigName = names[0]
+		}
+		fd.NewName, err = strconv.Unquote(names[1])
+		if err != nil {
+			fd.NewName = names[1]
+		}
 		return true
 	case len(fd.Extended) == 3 && strings.HasPrefix(fd.Extended[2], "Binary files ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName = names[0]
-		fd.NewName = names[1]
+		fd.OrigName, err = strconv.Unquote(names[0])
+		if err != nil {
+			fd.OrigName = names[0]
+		}
+		fd.NewName, err = strconv.Unquote(names[1])
+		if err != nil {
+			fd.NewName = names[1]
+		}
 		return true
 	default:
 		return false

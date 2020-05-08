@@ -203,6 +203,19 @@ func TestParseFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "quoted_filename.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/商品详情.txt",
+				OrigTime: nil,
+				NewName:  "b/商品详情.txt",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git \"a/\\345\\225\\206\\345\\223\\201\\350\\257\\246\\346\\203\\205.txt\" \"b/\\345\\225\\206\\345\\223\\201\\350\\257\\246\\346\\203\\205.txt\"",
+					"index e69de29..c67479b 100644",
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
