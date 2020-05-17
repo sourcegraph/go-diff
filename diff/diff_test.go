@@ -523,7 +523,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 			t.Errorf("%s: got %v instances of diff.FileDiff, expected %v", test.filename, got, want)
 		}
 
-		printed, err := PrintMultiFileDiff(diffs)
+		printed, err := PrintMultiFileDiff(diffs, nil)
 		if err != nil {
 			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
 		}
