@@ -1,0 +1,33 @@
+diff --git a/logo-old.png b/logo-old.png
+deleted file mode 100644
+index d29d0e9757e0d9b854a8ed58f170bcb454cc1ae3..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 0
+HcmV?d00001
+
+diff --git a/logo-old.png b/logo-old.png
+index ff82e793467f2050d731d75b4968d2e6b9c5d33b..d29d0e9757e0d9b854a8ed58f170bcb454cc1ae3 100644
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 0
+HcmV?d00001
+
+diff --git a/logo.png b/logo-old.png
+similarity index 100%
+rename from logo.png
+rename to logo-old.png
+diff --git a/logo.png b/logo.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff82e793467f2050d731d75b4968d2e6b9c5d33b
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 0
+HcmV?d00001
+
