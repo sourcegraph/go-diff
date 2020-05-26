@@ -340,9 +340,13 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 // that follow. It updates fd fields from the parsed extended headers.
 func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 	var err error
+	lineCount := len(fd.Extended)
+	if lineCount > 0 && !strings.HasPrefix(fd.Extended[0], "diff --git ") {
+		return false
+	}
 	switch {
-	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || len(fd.Extended) > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
-		strings.HasPrefix(fd.Extended[1], "new file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
+		strings.HasPrefix(fd.Extended[1], "new file mode "):
 
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName = "/dev/null"
@@ -351,8 +355,8 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 			fd.NewName = names[1]
 		}
 		return true
-	case (len(fd.Extended) == 3 || len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || len(fd.Extended) > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
-		strings.HasPrefix(fd.Extended[1], "deleted file mode ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
+		strings.HasPrefix(fd.Extended[1], "deleted file mode "):
 
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName, err = strconv.Unquote(names[0])
@@ -361,7 +365,7 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 		}
 		fd.NewName = "/dev/null"
 		return true
-	case len(fd.Extended) == 4 && strings.HasPrefix(fd.Extended[2], "rename from ") && strings.HasPrefix(fd.Extended[3], "rename to ") && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case lineCount == 4 && strings.HasPrefix(fd.Extended[2], "rename from ") && strings.HasPrefix(fd.Extended[3], "rename to "):
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName, err = strconv.Unquote(names[0])
 		if err != nil {
@@ -372,7 +376,7 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 			fd.NewName = names[1]
 		}
 		return true
-	case (len(fd.Extended) == 3 && strings.HasPrefix(fd.Extended[2], "Binary files ") || len(fd.Extended) > 3 && strings.HasPrefix(fd.Extended[2], "GIT binary patch")) && strings.HasPrefix(fd.Extended[0], "diff --git "):
+	case lineCount == 3 && strings.HasPrefix(fd.Extended[2], "Binary files ") || lineCount > 3 && strings.HasPrefix(fd.Extended[2], "GIT binary patch"):
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
 		fd.OrigName, err = strconv.Unquote(names[0])
 		if err != nil {
