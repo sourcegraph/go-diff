@@ -80,7 +80,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	// need to perform the check here.
 	hr := fr.HunksReader()
 	line, err := readLine(r.reader)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return fd, err
 	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
