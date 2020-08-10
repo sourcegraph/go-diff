@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -232,27 +233,11 @@ func (r *FileDiffReader) HunksReader() *HunksReader {
 // start with "---" and "+++" with the orig/new file names and
 // timestamps). Or starts with "Only in " message with dir path filename.
 func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimestamp, newTimestamp *time.Time, err error) {
-	if (r.fileHeaderLine != nil) && (bytes.HasPrefix(r.fileHeaderLine, onlyInMessagePrefix)) {
-		path := bytes.Split(bytes.TrimPrefix(
-			bytes.TrimSuffix(r.fileHeaderLine, []byte("\n")),
-			onlyInMessagePrefix), []byte(":"))
-		if len(path) != 2 {
-			return "", "", nil, nil,
-				&ParseError{r.line, r.offset, ErrBadOnlyInMessage}
+	if r.fileHeaderLine != nil {
+		if isOnlyMessage, source, filename := parseOnlyInMessage(r.fileHeaderLine); isOnlyMessage {
+			return filepath.Join(string(source), string(filename)),
+				"", nil, nil, nil
 		}
-
-		source, filename := string(bytes.TrimSpace(path[0])), string(bytes.TrimSpace(path[1]))
-
-		unquotedSource, err := strconv.Unquote(source)
-		if err == nil {
-			source = unquotedSource
-		}
-		unquotedFilename, err := strconv.Unquote(filename)
-		if err == nil {
-			filename = unquotedFilename
-		}
-
-		return filepath.Join(source, filename), "", nil, nil, nil
 	}
 
 	origName, origTimestamp, err = r.readOneFileHeader([]byte("--- "))
@@ -354,8 +339,14 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 				return xheaders, OverflowError(line)
 			}
 		}
-		if bytes.HasPrefix(line, []byte("--- ")) || (bytes.HasPrefix(line, onlyInMessagePrefix)) {
+		if bytes.HasPrefix(line, []byte("--- ")) {
 			// We've reached the file header.
+			r.fileHeaderLine = line // pass to readOneFileHeader (see fileHeaderLine field doc)
+			return xheaders, nil
+		}
+
+		// Reached message that file is added/deleted
+		if isOnlyInMessage, _, _ := parseOnlyInMessage(line); isOnlyInMessage {
 			r.fileHeaderLine = line // pass to readOneFileHeader (see fileHeaderLine field doc)
 			return xheaders, nil
 		}
@@ -436,7 +427,7 @@ var (
 
 	// ErrBadOnlyInMessage is when a file have a malformed `only in` message
 	// Should be in format `Only in {source}: {filename}`
-	ErrBadOnlyInMessage = errors.New("bad `only in` message")
+	ErrBadOnlyInMessage = errors.New("bad 'only in' message")
 )
 
 // ParseHunks parses hunks from a unified diff. The diff must consist
@@ -644,6 +635,18 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 			return hunks, err
 		}
 	}
+}
+
+// parseOnlyInMessage checks if line is a "Only in {source}: {filename}" and returns source and filename
+func parseOnlyInMessage(line []byte) (bool, []byte, []byte) {
+	re := regexp.MustCompile("Only in ([\x21-\x7E]+): ([\x21-\x7E]+)")
+	if re.Match(line) {
+		slices := re.FindSubmatch(line)
+		if fmt.Sprintf("Only in %s: %s", slices[1], slices[2]) == string(line) {
+			return true, slices[1], slices[2]
+		}
+	}
+	return false, nil, nil
 }
 
 // A ParseError is a description of a unified diff syntax error.
