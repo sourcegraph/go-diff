@@ -496,6 +496,60 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "sample_contains_added_deleted_files.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "source_a/file_1.txt",
+					OrigTime: nil,
+					NewName:  "source_b/file_1.txt",
+					NewTime:  nil,
+					Extended: []string{
+						"diff -u source_a/file_1.txt  source_b/file_1.txt",
+					},
+				},
+				{
+					OrigName: "source_a/file_2.txt",
+					OrigTime: nil,
+					NewName:  "",
+					NewTime:  nil,
+					Extended: nil,
+				},
+				{
+					OrigName: "source_b/file_3.txt",
+					OrigTime: nil,
+					NewName:  "",
+					NewTime:  nil,
+					Extended: nil,
+				},
+			},
+		},
+		{
+			filename: "sample_contains_only_added_deleted_files.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "source_a/file_1.txt",
+					OrigTime: nil,
+					NewName:  "",
+					NewTime:  nil,
+					Extended: nil,
+				},
+				{
+					OrigName: "source_a/file_2.txt",
+					OrigTime: nil,
+					NewName:  "",
+					NewTime:  nil,
+					Extended: nil,
+				},
+				{
+					OrigName: "source_b/file_3.txt",
+					OrigTime: nil,
+					NewName:  "",
+					NewTime:  nil,
+					Extended: nil,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
@@ -574,6 +628,8 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		{filename: "long_line_multi.diff", wantFileDiffs: 3},
 		{filename: "empty.diff", wantFileDiffs: 0},
 		{filename: "empty_multi.diff", wantFileDiffs: 2},
+		{filename: "sample_contains_added_deleted_files.diff", wantFileDiffs: 3},
+		{filename: "sample_contains_only_added_deleted_files.diff", wantFileDiffs: 3},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))

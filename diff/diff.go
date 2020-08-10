@@ -54,10 +54,12 @@ func (h *Hunk) Stat() Stat {
 }
 
 var (
-	hunkPrefix = []byte("@@ ")
+	hunkPrefix          = []byte("@@ ")
+	onlyInMessagePrefix = []byte("Only in ")
 )
 
 const hunkHeader = "@@ -%d,%d +%d,%d @@"
+const onlyInMessage = "Only in %s: %s\n"
 
 // diffTimeParseLayout is the layout used to parse the time in unified diff file
 // header timestamps.

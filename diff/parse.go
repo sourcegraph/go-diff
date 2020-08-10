@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -70,6 +71,12 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 		default:
 			return nil, err
 		}
+	}
+
+	// FileDiff is added/deleted file
+	// No further collection of hunks needed
+	if fd.NewName == "" {
+		return fd, nil
 	}
 
 	// Before reading hunks, check to see if there are any. If there
@@ -223,8 +230,31 @@ func (r *FileDiffReader) HunksReader() *HunksReader {
 
 // ReadFileHeaders reads the unified file diff header (the lines that
 // start with "---" and "+++" with the orig/new file names and
-// timestamps).
+// timestamps). Or starts with "Only in " message with dir path filename.
 func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimestamp, newTimestamp *time.Time, err error) {
+	if (r.fileHeaderLine != nil) && (bytes.HasPrefix(r.fileHeaderLine, onlyInMessagePrefix)) {
+		path := bytes.Split(bytes.TrimPrefix(
+			bytes.TrimSuffix(r.fileHeaderLine, []byte("\n")),
+			onlyInMessagePrefix), []byte(":"))
+		if len(path) != 2 {
+			return "", "", nil, nil,
+				&ParseError{r.line, r.offset, ErrBadOnlyInMessage}
+		}
+
+		source, filename := string(bytes.TrimSpace(path[0])), string(bytes.TrimSpace(path[1]))
+
+		unquotedSource, err := strconv.Unquote(source)
+		if err == nil {
+			source = unquotedSource
+		}
+		unquotedFilename, err := strconv.Unquote(filename)
+		if err == nil {
+			filename = unquotedFilename
+		}
+
+		return filepath.Join(source, filename), "", nil, nil, nil
+	}
+
 	origName, origTimestamp, err = r.readOneFileHeader([]byte("--- "))
 	if err != nil {
 		return "", "", nil, nil, err
@@ -324,7 +354,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 				return xheaders, OverflowError(line)
 			}
 		}
-		if bytes.HasPrefix(line, []byte("--- ")) {
+		if bytes.HasPrefix(line, []byte("--- ")) || (bytes.HasPrefix(line, onlyInMessagePrefix)) {
 			// We've reached the file header.
 			r.fileHeaderLine = line // pass to readOneFileHeader (see fileHeaderLine field doc)
 			return xheaders, nil
@@ -403,6 +433,10 @@ var (
 
 	// ErrExtendedHeadersEOF is when an EOF was encountered while reading extended file headers, which means that there were no ---/+++ headers encountered before hunks (if any) began.
 	ErrExtendedHeadersEOF = errors.New("expected file header while reading extended headers, got EOF")
+
+	// ErrBadOnlyInMessage is when a file have a malformed `only in` message
+	// Should be in format `Only in {source}: {filename}`
+	ErrBadOnlyInMessage = errors.New("bad `only in` message")
 )
 
 // ParseHunks parses hunks from a unified diff. The diff must consist

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"sourcegraph.com/sqs/pbtypes"
@@ -34,6 +35,16 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		if _, err := fmt.Fprintln(&buf, xheader); err != nil {
 			return nil, err
 		}
+	}
+
+	// FileDiff is added/deleted file
+	// No further hunks printing needed
+	if d.NewName == "" {
+		_, err := fmt.Fprintf(&buf, onlyInMessage, filepath.Dir(d.OrigName), filepath.Base(d.OrigName))
+		if err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
 	}
 
 	if d.Hunks == nil {
