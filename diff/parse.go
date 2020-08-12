@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -231,7 +230,8 @@ func (r *FileDiffReader) HunksReader() *HunksReader {
 
 // ReadFileHeaders reads the unified file diff header (the lines that
 // start with "---" and "+++" with the orig/new file names and
-// timestamps). Or starts with "Only in " message with dir path filename.
+// timestamps). Or which starts with "Only in " with dir path and filename.
+// "Only in" message is supported in POSIX locale: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/diff.html#tag_20_34_10
 func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimestamp, newTimestamp *time.Time, err error) {
 	if r.fileHeaderLine != nil {
 		if isOnlyMessage, source, filename := parseOnlyInMessage(r.fileHeaderLine); isOnlyMessage {
@@ -639,14 +639,15 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 
 // parseOnlyInMessage checks if line is a "Only in {source}: {filename}" and returns source and filename
 func parseOnlyInMessage(line []byte) (bool, []byte, []byte) {
-	re := regexp.MustCompile("Only in ([\x21-\x7E]+): ([\x21-\x7E]+)")
-	if re.Match(line) {
-		slices := re.FindSubmatch(line)
-		if fmt.Sprintf("Only in %s: %s", slices[1], slices[2]) == string(line) {
-			return true, slices[1], slices[2]
-		}
+	if !bytes.HasPrefix(line, onlyInMessagePrefix) {
+		return false, nil, nil
 	}
-	return false, nil, nil
+	line = line[len(onlyInMessagePrefix):]
+	idx := bytes.Index(line, []byte(": "))
+	if idx < 0 {
+		return false, nil, nil
+	}
+	return true, line[:idx], line[idx+2:]
 }
 
 // A ParseError is a description of a unified diff syntax error.
