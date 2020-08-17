@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/shurcooL/go-goon"
-	"sourcegraph.com/sqs/pbtypes"
 )
 
 func init() {
@@ -103,27 +102,33 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			filename: "sample_file.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				// Timestamp{Seconds: 1255273940}
+				OrigTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 212, 0, 0, 0, 0, 255, 255},
 				NewName:  "newname",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+				// Timestamp{Seconds: 1255273950}
+				NewTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 222, 0, 0, 0, 0, 255, 255},
 			},
 		},
 		{
 			filename: "sample_file_no_fractional_seconds.diff",
 			wantDiff: &FileDiff{
 				OrigName: "goyaml.go",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1322164040},
+				// Timestamp{Seconds: 1322164040}
+				OrigTime: []byte{1, 0, 0, 0, 14, 198, 96, 150, 72, 0, 0, 0, 0, 255, 255},
 				NewName:  "goyaml.go",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1322486679},
+				// Timestamp{Seconds: 1322486679}
+				NewTime: []byte{1, 0, 0, 0, 14, 198, 101, 130, 151, 0, 0, 0, 0, 255, 255},
 			},
 		},
 		{
 			filename: "sample_file_extended.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				// Timestamp{Seconds: 1255273940}
+				OrigTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 212, 0, 0, 0, 0, 255, 255},
 				NewName:  "newname",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+				// Timestamp{Seconds: 1255273950}
+				NewTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 222, 0, 0, 0, 0, 255, 255},
 				Extended: []string{
 					"diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go",
 					"index aa4de15..7c048ab 100644",

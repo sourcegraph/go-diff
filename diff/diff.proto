@@ -2,7 +2,6 @@ syntax = "proto3";
 package diff;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "sourcegraph.com/sqs/pbtypes/timestamp.proto";
 
 option (gogoproto.goproto_getters_all) = false;
 option (gogoproto.unmarshaler_all) = true;
@@ -20,13 +19,13 @@ message FileDiff {
 	string OrigName = 1;
 
 	// the original timestamp (nil if not present)
-	pbtypes.Timestamp OrigTime = 2;
+	bytes OrigTime = 2;
 
 	// the new name of the file (often same as OrigName)
 	string NewName = 3;
 
 	// the new timestamp (nil if not present)
-	pbtypes.Timestamp NewTime = 4;
+	bytes NewTime = 4;
 
 	// extended header lines (e.g., git's "new mode <mode>", "rename from <path>", etc.)
 	repeated string Extended = 5;

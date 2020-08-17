@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"sourcegraph.com/sqs/pbtypes"
 )
 
 // ParseMultiFileDiff parses a multi-file unified diff. It returns an error if
@@ -198,12 +196,18 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 		return nil, err
 	}
 	if origTime != nil {
-		ts := pbtypes.NewTimestamp(*origTime)
-		fd.OrigTime = &ts
+		ts, err := origTime.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		fd.OrigTime = ts
 	}
 	if newTime != nil {
-		ts := pbtypes.NewTimestamp(*newTime)
-		fd.NewTime = &ts
+		ts, err := newTime.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		fd.NewTime = ts
 	}
 
 	return fd, nil
@@ -293,7 +297,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 type OverflowError string
 
 func (e OverflowError) Error() string {
-	return fmt.Sprintf("overflowed into next file: %s", e)
+	return fmt.Sprintf("overflowed into next file: %s", string(e))
 }
 
 // ReadExtendedHeaders reads the extended header lines, if any, from a

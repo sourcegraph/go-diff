@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"time"
-
-	"sourcegraph.com/sqs/pbtypes"
 )
 
 // PrintMultiFileDiff prints a multi-file diff in unified diff format.
@@ -58,11 +56,15 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func timePtr(ts *pbtypes.Timestamp) *time.Time {
+func timePtr(ts []byte) *time.Time {
 	if ts == nil {
 		return nil
 	}
-	t := ts.Time()
+	var t time.Time
+	err := t.UnmarshalBinary(ts)
+	if err != nil {
+		return nil
+	}
 	return &t
 }
 
