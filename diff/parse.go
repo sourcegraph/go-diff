@@ -198,14 +198,14 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	if origTime != nil {
 		ts, err := origTime.MarshalBinary()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("marshalling timestamp %v: %v", origTime, err)
 		}
 		fd.OrigTime = ts
 	}
 	if newTime != nil {
 		ts, err := newTime.MarshalBinary()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("marshalling timestamp %v: %v", newTime, err)
 		}
 		fd.NewTime = ts
 	}

@@ -61,8 +61,9 @@ func timePtr(ts []byte) *time.Time {
 		return nil
 	}
 	var t time.Time
-	err := t.UnmarshalBinary(ts)
-	if err != nil {
+	// Since ts value is Marshaled before, it should successfully Unmarshal value here.
+	// Ignoring error message.
+	if t.UnmarshalBinary(ts) != nil {
 		return nil
 	}
 	return &t

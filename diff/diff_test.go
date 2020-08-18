@@ -12,6 +12,8 @@ import (
 	"github.com/shurcooL/go-goon"
 )
 
+var timestampsB [][]byte
+
 func init() {
 	// Diffs include times that by default are generated in the local
 	// timezone. To ensure that tests behave the same in all timezones
@@ -21,6 +23,19 @@ func init() {
 	// This is safe to do in tests but should not (and need not) be
 	// done for the main code.
 	time.Local = time.UTC
+
+	timestamps := []int64{
+		1255273940, // 2009-10-11 15:12:20
+		1255273950, // 2009-10-11 15:12:30
+		1322164040, // 2011-11-24 19:47:20
+		1322486679, // 2011-11-28 13:24:39
+	}
+	for _, timestamp := range timestamps {
+		// Ignoring error here
+		if timeBytes, err := time.Unix(timestamp, 0).MarshalBinary(); err == nil {
+			timestampsB = append(timestampsB, timeBytes)
+		}
+	}
 }
 
 func TestParseHunkNoChunksize(t *testing.T) {
@@ -102,33 +117,27 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			filename: "sample_file.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				// Timestamp{Seconds: 1255273940}
-				OrigTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 212, 0, 0, 0, 0, 255, 255},
+				OrigTime: timestampsB[0],
 				NewName:  "newname",
-				// Timestamp{Seconds: 1255273950}
-				NewTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 222, 0, 0, 0, 0, 255, 255},
+				NewTime:  timestampsB[1],
 			},
 		},
 		{
 			filename: "sample_file_no_fractional_seconds.diff",
 			wantDiff: &FileDiff{
 				OrigName: "goyaml.go",
-				// Timestamp{Seconds: 1322164040}
-				OrigTime: []byte{1, 0, 0, 0, 14, 198, 96, 150, 72, 0, 0, 0, 0, 255, 255},
+				OrigTime: timestampsB[2],
 				NewName:  "goyaml.go",
-				// Timestamp{Seconds: 1322486679}
-				NewTime: []byte{1, 0, 0, 0, 14, 198, 101, 130, 151, 0, 0, 0, 0, 255, 255},
+				NewTime:  timestampsB[3],
 			},
 		},
 		{
 			filename: "sample_file_extended.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				// Timestamp{Seconds: 1255273940}
-				OrigTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 212, 0, 0, 0, 0, 255, 255},
+				OrigTime: timestampsB[0],
 				NewName:  "newname",
-				// Timestamp{Seconds: 1255273950}
-				NewTime: []byte{1, 0, 0, 0, 14, 194, 99, 236, 222, 0, 0, 0, 0, 255, 255},
+				NewTime:  timestampsB[1],
 				Extended: []string{
 					"diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go",
 					"index aa4de15..7c048ab 100644",
