@@ -12,7 +12,7 @@ import (
 	"github.com/shurcooL/go-goon"
 )
 
-var timestampsB [][]byte
+var timestampsT []time.Time
 
 func init() {
 	// Diffs include times that by default are generated in the local
@@ -31,10 +31,7 @@ func init() {
 		1322486679, // 2011-11-28 13:24:39
 	}
 	for _, timestamp := range timestamps {
-		// Ignoring error here
-		if timeBytes, err := time.Unix(timestamp, 0).MarshalBinary(); err == nil {
-			timestampsB = append(timestampsB, timeBytes)
-		}
+		timestampsT = append(timestampsT, time.Unix(timestamp, 0))
 	}
 }
 
@@ -117,27 +114,27 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			filename: "sample_file.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: timestampsB[0],
+				OrigTime: &timestampsT[0],
 				NewName:  "newname",
-				NewTime:  timestampsB[1],
+				NewTime:  &timestampsT[1],
 			},
 		},
 		{
 			filename: "sample_file_no_fractional_seconds.diff",
 			wantDiff: &FileDiff{
 				OrigName: "goyaml.go",
-				OrigTime: timestampsB[2],
+				OrigTime: &timestampsT[2],
 				NewName:  "goyaml.go",
-				NewTime:  timestampsB[3],
+				NewTime:  &timestampsT[3],
 			},
 		},
 		{
 			filename: "sample_file_extended.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: timestampsB[0],
+				OrigTime: &timestampsT[0],
 				NewName:  "newname",
-				NewTime:  timestampsB[1],
+				NewTime:  &timestampsT[1],
 				Extended: []string{
 					"diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go",
 					"index aa4de15..7c048ab 100644",
@@ -241,8 +238,18 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
 		}
 
+		got, want := diff, test.wantDiff
+		// reflect.DeepEqual will compare OrigTime and NewTime by pointers
+		// If time are equal by their value, assign same *time.Time from got to want object
+		if (got.OrigTime != nil) && (want.OrigTime != nil) && (*got).OrigTime.Equal(*want.OrigTime) {
+			want.OrigTime = got.OrigTime
+		}
+		if (got.NewTime != nil) && (want.NewTime != nil) && (*got).NewTime.Equal(*want.NewTime) {
+			want.NewTime = got.NewTime
+		}
+		// Ignore comparing of hunks
 		diff.Hunks = nil
-		if got, want := diff, test.wantDiff; !reflect.DeepEqual(got, want) {
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
 		}
 	}

@@ -38,10 +38,10 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		return buf.Bytes(), nil
 	}
 
-	if err := printFileHeader(&buf, "--- ", d.OrigName, timePtr(d.OrigTime)); err != nil {
+	if err := printFileHeader(&buf, "--- ", d.OrigName, d.OrigTime); err != nil {
 		return nil, err
 	}
-	if err := printFileHeader(&buf, "+++ ", d.NewName, timePtr(d.NewTime)); err != nil {
+	if err := printFileHeader(&buf, "+++ ", d.NewName, d.NewTime); err != nil {
 		return nil, err
 	}
 
@@ -54,19 +54,6 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func timePtr(ts []byte) *time.Time {
-	if ts == nil {
-		return nil
-	}
-	var t time.Time
-	// Since ts value is Marshaled before, it should successfully Unmarshal value here.
-	// Ignoring error message.
-	if t.UnmarshalBinary(ts) != nil {
-		return nil
-	}
-	return &t
 }
 
 func printFileHeader(w io.Writer, prefix string, filename string, timestamp *time.Time) error {
