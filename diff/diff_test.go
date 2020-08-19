@@ -216,6 +216,23 @@ func TestParseFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "sample_file_extended_binary_rename.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/data/Font.png",
+				OrigTime: nil,
+				NewName:  "b/data/Other.png",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/data/Font.png b/data/Other.png",
+					"similarity index 51%",
+					"rename from data/Font.png",
+					"rename to data/Other.png",
+					"index 17a971d..599f8dd 100644",
+					"Binary files a/data/Font.png and b/data/Other.png differ",
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
