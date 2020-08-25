@@ -308,7 +308,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 type OverflowError string
 
 func (e OverflowError) Error() string {
-	return fmt.Sprintf("overflowed into next file: %s", e)
+	return fmt.Sprintf("overflowed into next file: %s", string(e))
 }
 
 // ReadExtendedHeaders reads the extended header lines, if any, from a

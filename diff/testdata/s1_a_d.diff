@@ -1,0 +1,17 @@
+Only in source_1_a: file_1.txt
+diff -u source_1_a/file_2.txt source_1_d/file_2.txt
+--- source_1_a/file_2.txt	2020-07-28 12:54:18.000000000 +0000
++++ source_1_d/file_2.txt	2020-07-28 14:09:51.000000000 +0000
+@@ -3,9 +3,9 @@
+ Affronting everything discretion men now own did.
+ Still round match we to.
+ Frankness pronounce daughters remainder extensive has but.
++Happiness cordially one determine concluded fat.
+ Plenty season beyond by hardly giving of.
+-Consulted or acuteness dejection an smallness if.
+-Outward general passage another as it.
+ Very his are come man walk one next.
+ Delighted prevailed supported too not remainder perpetual who furnished.
+ Nay affronting bed projection compliment instrument.
++Still round match we to here.
+Only in source_1_d: file_3.txt
