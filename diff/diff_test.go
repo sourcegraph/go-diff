@@ -630,6 +630,25 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "sample_multi_file_without_extended.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "source_1_a/file_1.txt",
+					OrigTime: nil,
+					NewName:  "source_1_c/file_1.txt",
+					NewTime:  nil,
+					Extended: nil,
+				},
+				{
+					OrigName: "source_1_a/file_2.txt",
+					OrigTime: nil,
+					NewName:  "source_1_c/file_2.txt",
+					NewTime:  nil,
+					Extended: nil,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))

@@ -308,7 +308,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 type OverflowError string
 
 func (e OverflowError) Error() string {
-	return fmt.Sprintf("overflowed into next file: %s", e)
+	return fmt.Sprintf("overflowed into next file: %s", string(e))
 }
 
 // ReadExtendedHeaders reads the extended header lines, if any, from a
@@ -531,7 +531,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				return r.hunk, nil
 			}
 
-			if len(line) >= 1 && !linePrefix(line[0]) {
+			if len(line) >= 1 && (!linePrefix(line[0]) || bytes.HasPrefix(line, []byte("--- "))) {
 				// Bad hunk header line. If we're reading a multi-file
 				// diff, this may be the end of the current
 				// file. Return a "rich" error that lets our caller
