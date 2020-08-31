@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"io/ioutil"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/shurcooL/go-goon"
 )
 
@@ -58,7 +58,7 @@ func TestParseHunkNoChunksize(t *testing.T) {
 	}
 	h := diff[0]
 	h.Body = nil // We're not testing the body.
-	if !reflect.DeepEqual(h, correct) {
+	if !cmp.Equal(h, correct) {
 		t.Errorf("%s: Got %#v, want %#v", filename, h, correct)
 	}
 }
@@ -238,18 +238,8 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
 		}
 
-		got, want := diff, test.wantDiff
-		// reflect.DeepEqual will compare OrigTime and NewTime by pointers
-		// If time are equal by their value, assign same *time.Time from got to want object
-		if (got.OrigTime != nil) && (want.OrigTime != nil) && (*got).OrigTime.Equal(*want.OrigTime) {
-			want.OrigTime = got.OrigTime
-		}
-		if (got.NewTime != nil) && (want.NewTime != nil) && (*got).NewTime.Equal(*want.NewTime) {
-			want.NewTime = got.NewTime
-		}
-		// Ignore comparing of hunks
 		diff.Hunks = nil
-		if !reflect.DeepEqual(got, want) {
+		if got, want := diff, test.wantDiff; !cmp.Equal(got, want) {
 			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
 		}
 	}
@@ -531,7 +521,7 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 		for i := range diffs {
 			diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
 		}
-		if got, want := diffs, test.wantDiffs; !reflect.DeepEqual(got, want) {
+		if got, want := diffs, test.wantDiffs; !cmp.Equal(got, want) {
 			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
 		}
 	}
@@ -562,7 +552,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 			t.Fatal(err)
 		}
 		diff, err := ParseFileDiff(diffData)
-		if !reflect.DeepEqual(err, test.wantParseErr) {
+		if !cmp.Equal(err, test.wantParseErr) {
 			t.Errorf("%s: got ParseFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
 			continue
 		}
@@ -739,7 +729,7 @@ func TestFileDiff_Stat(t *testing.T) {
 	for label, test := range tests {
 		fdiff := &FileDiff{Hunks: test.hunks}
 		stat := fdiff.Stat()
-		if !reflect.DeepEqual(stat, test.want) {
+		if !cmp.Equal(stat, test.want) {
 			t.Errorf("%s: got diff stat %+v, want %+v", label, stat, test.want)
 			continue
 		}
