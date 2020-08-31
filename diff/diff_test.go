@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -552,7 +553,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 			t.Fatal(err)
 		}
 		diff, err := ParseFileDiff(diffData)
-		if !cmp.Equal(err, test.wantParseErr) {
+		if !reflect.DeepEqual(err, test.wantParseErr) {
 			t.Errorf("%s: got ParseFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
 			continue
 		}
