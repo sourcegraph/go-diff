@@ -2,9 +2,9 @@ package diff
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -544,7 +544,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		{filename: "sample_file_extended_empty_binary.diff"},
 		{
 			filename:     "empty.diff",
-			wantParseErr: &ParseError{0, 0, ErrExtendedHeadersEOF},
+			wantParseErr: ParseError{0, 0, ErrExtendedHeadersEOF},
 		},
 	}
 	for _, test := range tests {
@@ -553,7 +553,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 			t.Fatal(err)
 		}
 		diff, err := ParseFileDiff(diffData)
-		if !reflect.DeepEqual(err, test.wantParseErr) {
+		if !errors.Is(err, test.wantParseErr) {
 			t.Errorf("%s: got ParseFileDiff err %v, want %v", test.filename, err, test.wantParseErr)
 			continue
 		}
