@@ -56,7 +56,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	fd, err := fr.ReadAllHeaders()
 	if err != nil {
 		switch e := err.(type) {
-		case ParseError:
+		case *ParseError:
 			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
 				return nil, io.EOF
 			}
@@ -88,7 +88,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 		r.line = fr.line
 		r.offset = fr.offset
 		if err != nil {
-			if e0, ok := err.(ParseError); ok {
+			if e0, ok := err.(*ParseError); ok {
 				if e, ok := e0.Err.(*ErrBadHunkLine); ok {
 					// This just means we finished reading the hunks for the
 					// current file. See the ErrBadHunkLine doc for more info.
@@ -177,7 +177,7 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	fd := &FileDiff{}
 
 	fd.Extended, err = r.ReadExtendedHeaders()
-	if pe, ok := err.(ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
+	if pe, ok := err.(*ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
 		wasEmpty := handleEmpty(fd)
 		if wasEmpty {
 			return fd, nil
@@ -252,7 +252,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 		var err error
 		line, err = readLine(r.reader)
 		if err == io.EOF {
-			return "", nil, ParseError{r.line, r.offset, ErrNoFileHeader}
+			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
 			return "", nil, err
 		}
@@ -262,7 +262,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	}
 
 	if !bytes.HasPrefix(line, prefix) {
-		return "", nil, ParseError{r.line, r.offset, ErrBadFileHeader}
+		return "", nil, &ParseError{r.line, r.offset, ErrBadFileHeader}
 	}
 
 	r.offset += int64(len(line))
@@ -304,7 +304,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 			var err error
 			line, err = readLine(r.reader)
 			if err == io.EOF {
-				return xheaders, ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
+				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
 			} else if err != nil {
 				return xheaders, err
 			}
@@ -459,7 +459,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		if r.hunk == nil {
 			// Check for presence of hunk header.
 			if !bytes.HasPrefix(line, hunkPrefix) {
-				return nil, ParseError{r.line, r.offset, ErrNoHunkHeader}
+				return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
 			}
 
 			// Parse hunk header.
@@ -470,14 +470,14 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			}
 			header, section, err := normalizeHeader(string(line))
 			if err != nil {
-				return nil, ParseError{r.line, r.offset, err}
+				return nil, &ParseError{r.line, r.offset, err}
 			}
 			n, err := fmt.Sscanf(header, hunkHeader, items...)
 			if err != nil {
 				return nil, err
 			}
 			if n < len(items) {
-				return nil, ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
+				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
 			}
 
 			r.hunk.Section = section
@@ -502,7 +502,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				// diff, this may be the end of the current
 				// file. Return a "rich" error that lets our caller
 				// handle that case.
-				return r.hunk, ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
 			if bytes.Equal(line, []byte(noNewlineMessage)) {
 				if lastLineFromOrig {
@@ -615,7 +615,7 @@ type ParseError struct {
 	Err    error // The actual error
 }
 
-func (e ParseError) Error() string {
+func (e *ParseError) Error() string {
 	return fmt.Sprintf("line %d, char %d: %s", e.Line, e.Offset, e.Err)
 }
 
