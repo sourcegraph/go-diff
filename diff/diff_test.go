@@ -9,9 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shurcooL/go-goon"
-	"sourcegraph.com/sqs/pbtypes"
+	"github.com/google/go-cmp/cmp"
 )
+
+func unix(sec int64) *time.Time {
+	t := time.Unix(sec, 0)
+	return &t
+}
 
 func init() {
 	// Diffs include times that by default are generated in the local
@@ -47,8 +51,8 @@ func TestParseHunkNoChunksize(t *testing.T) {
 	}
 	h := diff[0]
 	h.Body = nil // We're not testing the body.
-	if !reflect.DeepEqual(h, correct) {
-		t.Errorf("%s: Got %#v, want %#v", filename, h, correct)
+	if !cmp.Equal(h, correct) {
+		t.Errorf("%s: got - want:\n%s", filename, cmp.Diff(correct, h))
 	}
 }
 
@@ -89,7 +93,7 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 			t.Errorf("%s: PrintHunks: %s", test.filename, err)
 		}
 		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
+			t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
 		}
 	}
 }
@@ -103,27 +107,27 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			filename: "sample_file.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				OrigTime: unix(1255273940), // 2009-10-11 15:12:20
 				NewName:  "newname",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+				NewTime:  unix(1255273950), // 2009-10-11 15:12:30
 			},
 		},
 		{
 			filename: "sample_file_no_fractional_seconds.diff",
 			wantDiff: &FileDiff{
 				OrigName: "goyaml.go",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1322164040},
+				OrigTime: unix(1322164040), // 2011-11-24 19:47:20
 				NewName:  "goyaml.go",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1322486679},
+				NewTime:  unix(1322486679), // 2011-11-28 13:24:39
 			},
 		},
 		{
 			filename: "sample_file_extended.diff",
 			wantDiff: &FileDiff{
 				OrigName: "oldname",
-				OrigTime: &pbtypes.Timestamp{Seconds: 1255273940},
+				OrigTime: unix(1255273940), // 2009-10-11 15:12:20
 				NewName:  "newname",
-				NewTime:  &pbtypes.Timestamp{Seconds: 1255273950},
+				NewTime:  unix(1255273950), // 2009-10-11 15:12:30
 				Extended: []string{
 					"diff --git a/vcs/git_cmd.go b/vcs/git_cmd.go",
 					"index aa4de15..7c048ab 100644",
@@ -245,8 +249,8 @@ func TestParseFileDiffHeaders(t *testing.T) {
 		}
 
 		diff.Hunks = nil
-		if got, want := diff, test.wantDiff; !reflect.DeepEqual(got, want) {
-			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
+		if got, want := diff, test.wantDiff; !cmp.Equal(got, want) {
+			t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
 		}
 	}
 }
@@ -663,8 +667,8 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 		for i := range diffs {
 			diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
 		}
-		if got, want := diffs, test.wantDiffs; !reflect.DeepEqual(got, want) {
-			t.Errorf("%s:\n\ngot: %v\nwant: %v", test.filename, goon.Sdump(got), goon.Sdump(want))
+		if got, want := diffs, test.wantDiffs; !cmp.Equal(got, want) {
+			t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
 		}
 	}
 }
@@ -707,7 +711,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 			t.Errorf("%s: PrintFileDiff: %s", test.filename, err)
 		}
 		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed file diff != original file diff\n\n# PrintFileDiff output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
+			t.Errorf("%s: printed file diff != original file diff\n\n# PrintFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
 		}
 	}
 }
@@ -755,7 +759,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
 		}
 		if !bytes.Equal(printed, diffData) {
-			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output:\n%s\n\n# Original:\n%s", test.filename, printed, diffData)
+			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
 		}
 	}
 }
@@ -816,7 +820,7 @@ func TestNoNewlineAtEnd(t *testing.T) {
 				continue
 			}
 			if printed := string(printed); printed != test.diff {
-				t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output:\n%s\n\n# Original:\n%s", label, printed, test.diff)
+				t.Errorf("%s: printed diff hunks != original diff hunks\n\n# PrintHunks output - Original:\n%s", label, cmp.Diff(test.diff, printed))
 			}
 		}
 	}
@@ -875,8 +879,8 @@ func TestFileDiff_Stat(t *testing.T) {
 	for label, test := range tests {
 		fdiff := &FileDiff{Hunks: test.hunks}
 		stat := fdiff.Stat()
-		if !reflect.DeepEqual(stat, test.want) {
-			t.Errorf("%s: got diff stat %+v, want %+v", label, stat, test.want)
+		if !cmp.Equal(stat, test.want) {
+			t.Errorf("%s: got - want diff stat\n%s", label, cmp.Diff(test.want, stat))
 			continue
 		}
 	}

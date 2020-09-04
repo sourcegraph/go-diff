@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"sourcegraph.com/sqs/pbtypes"
 )
 
 // ParseMultiFileDiff parses a multi-file unified diff. It returns an error if
@@ -205,12 +203,10 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 		return nil, err
 	}
 	if origTime != nil {
-		ts := pbtypes.NewTimestamp(*origTime)
-		fd.OrigTime = &ts
+		fd.OrigTime = origTime
 	}
 	if newTime != nil {
-		ts := pbtypes.NewTimestamp(*newTime)
-		fd.NewTime = &ts
+		fd.NewTime = newTime
 	}
 
 	return fd, nil

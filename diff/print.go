@@ -6,8 +6,6 @@ import (
 	"io"
 	"path/filepath"
 	"time"
-
-	"sourcegraph.com/sqs/pbtypes"
 )
 
 // PrintMultiFileDiff prints a multi-file diff in unified diff format.
@@ -51,10 +49,10 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		return buf.Bytes(), nil
 	}
 
-	if err := printFileHeader(&buf, "--- ", d.OrigName, timePtr(d.OrigTime)); err != nil {
+	if err := printFileHeader(&buf, "--- ", d.OrigName, d.OrigTime); err != nil {
 		return nil, err
 	}
-	if err := printFileHeader(&buf, "+++ ", d.NewName, timePtr(d.NewTime)); err != nil {
+	if err := printFileHeader(&buf, "+++ ", d.NewName, d.NewTime); err != nil {
 		return nil, err
 	}
 
@@ -67,14 +65,6 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func timePtr(ts *pbtypes.Timestamp) *time.Time {
-	if ts == nil {
-		return nil
-	}
-	t := ts.Time()
-	return &t
 }
 
 func printFileHeader(w io.Writer, prefix string, filename string, timestamp *time.Time) error {
