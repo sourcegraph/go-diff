@@ -73,6 +73,7 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{filename: "empty_new.diff"},
 		{filename: "oneline_hunk.diff"},
 		{filename: "empty.diff"},
+		{filename: "sample_hunk_lines_start_with_minuses.diff"},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
