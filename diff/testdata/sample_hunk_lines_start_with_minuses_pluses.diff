@@ -1,0 +1,8 @@
+@@ -1,5 +1,5 @@
+ select 1;
+--- this is my query
++++ this is my query
+ select 2;
+ select 3;
+--- this is the last line
++++ this is the last line

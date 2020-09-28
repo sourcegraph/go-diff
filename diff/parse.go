@@ -23,14 +23,14 @@ func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
 // NewMultiFileDiffReader returns a new MultiFileDiffReader that reads
 // a multi-file unified diff from r.
 func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
-	return &MultiFileDiffReader{reader: bufio.NewReader(r)}
+	return &MultiFileDiffReader{reader: newLineReader(r)}
 }
 
 // MultiFileDiffReader reads a multi-file unified diff.
 type MultiFileDiffReader struct {
 	line   int
 	offset int64
-	reader *bufio.Reader
+	reader *lineReader
 
 	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
 
@@ -85,7 +85,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	// caused by the lack of any hunks, or a malformatted hunk, so we
 	// need to perform the check here.
 	hr := fr.HunksReader()
-	line, err := readLine(r.reader)
+	line, err := r.reader.readLine()
 	if err != nil && err != io.EOF {
 		return fd, err
 	}
@@ -141,14 +141,14 @@ func ParseFileDiff(diff []byte) (*FileDiff, error) {
 // NewFileDiffReader returns a new FileDiffReader that reads a file
 // unified diff.
 func NewFileDiffReader(r io.Reader) *FileDiffReader {
-	return &FileDiffReader{reader: bufio.NewReader(r)}
+	return &FileDiffReader{reader: &lineReader{reader: bufio.NewReader(r)}}
 }
 
 // FileDiffReader reads a unified file diff.
 type FileDiffReader struct {
 	line   int
 	offset int64
-	reader *bufio.Reader
+	reader *lineReader
 
 	// fileHeaderLine is the first file header line, set by:
 	//
@@ -266,7 +266,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 
 	if r.fileHeaderLine == nil {
 		var err error
-		line, err = readLine(r.reader)
+		line, err = r.reader.readLine()
 		if err == io.EOF {
 			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
@@ -318,7 +318,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 		var line []byte
 		if r.fileHeaderLine == nil {
 			var err error
-			line, err = readLine(r.reader)
+			line, err = r.reader.readLine()
 			if err == io.EOF {
 				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
 			} else if err != nil {
@@ -447,7 +447,7 @@ func ParseHunks(diff []byte) ([]*Hunk, error) {
 // NewHunksReader returns a new HunksReader that reads unified diff hunks
 // from r.
 func NewHunksReader(r io.Reader) *HunksReader {
-	return &HunksReader{reader: bufio.NewReader(r)}
+	return &HunksReader{reader: &lineReader{reader: bufio.NewReader(r)}}
 }
 
 // A HunksReader reads hunks from a unified diff.
@@ -455,7 +455,7 @@ type HunksReader struct {
 	line   int
 	offset int64
 	hunk   *Hunk
-	reader *bufio.Reader
+	reader *lineReader
 
 	nextHunkHeaderLine []byte
 }
@@ -474,7 +474,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			line = r.nextHunkHeaderLine
 			r.nextHunkHeaderLine = nil
 		} else {
-			line, err = readLine(r.reader)
+			line, err = r.reader.readLine()
 			if err != nil {
 				if err == io.EOF && r.hunk != nil {
 					return r.hunk, nil
@@ -518,12 +518,15 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			// If the line starts with `---` and the next one with `+++` we're
 			// looking at a non-extended file header and need to abort.
 			if bytes.HasPrefix(line, []byte("---")) {
-				ok, err := peekPrefix(r.reader, "+++")
+				ok, err := r.reader.nextLineStartsWith("+++")
 				if err != nil {
 					return r.hunk, err
 				}
 				if ok {
-					return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+					ok2, _ := r.reader.nextNextLineStartsWith(string(hunkPrefix))
+					if ok2 {
+						return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+					}
 				}
 			}
 
@@ -591,19 +594,6 @@ func linePrefix(c byte) bool {
 		}
 	}
 	return false
-}
-
-// peekPrefix peeks into the given reader to check whether the next
-// bytes match the given prefix.
-func peekPrefix(reader *bufio.Reader, prefix string) (bool, error) {
-	next, err := reader.Peek(len(prefix))
-	if err != nil {
-		if err == io.EOF {
-			return false, nil
-		}
-		return false, err
-	}
-	return bytes.HasPrefix(next, []byte(prefix)), nil
 }
 
 // normalizeHeader takes a header of the form:
