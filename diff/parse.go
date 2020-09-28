@@ -518,7 +518,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			// If the line starts with `---` and the next one with `+++` we're
 			// looking at a non-extended file header and need to abort.
 			if bytes.HasPrefix(line, []byte("---")) {
-				ok, err := nextLineHasPrefix(r.reader, []byte("+++"))
+				ok, err := peekPrefix(r.reader, "+++")
 				if err != nil {
 					return r.hunk, err
 				}
@@ -593,9 +593,9 @@ func linePrefix(c byte) bool {
 	return false
 }
 
-// nextLineHasPrefix peeks into the given reader to check whether the next
+// peekPrefix peeks into the given reader to check whether the next
 // bytes match the given prefix.
-func nextLineHasPrefix(reader *bufio.Reader, prefix []byte) (bool, error) {
+func peekPrefix(reader *bufio.Reader, prefix string) (bool, error) {
 	next, err := reader.Peek(len(prefix))
 	if err != nil {
 		if err == io.EOF {
@@ -603,7 +603,7 @@ func nextLineHasPrefix(reader *bufio.Reader, prefix []byte) (bool, error) {
 		}
 		return false, err
 	}
-	return bytes.HasPrefix(next, prefix), nil
+	return bytes.HasPrefix(next, []byte(prefix)), nil
 }
 
 // normalizeHeader takes a header of the form:
