@@ -598,6 +598,9 @@ func linePrefix(c byte) bool {
 func nextLineHasPrefix(reader *bufio.Reader, prefix []byte) (bool, error) {
 	next, err := reader.Peek(len(prefix))
 	if err != nil {
+		if err == io.EOF {
+			return false, nil
+		}
 		return false, err
 	}
 	return bytes.HasPrefix(next, prefix), nil
