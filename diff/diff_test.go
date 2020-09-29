@@ -74,6 +74,7 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{filename: "oneline_hunk.diff"},
 		{filename: "empty.diff"},
 		{filename: "sample_hunk_lines_start_with_minuses.diff"},
+		{filename: "sample_hunk_lines_start_with_minuses_pluses.diff"},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
@@ -736,6 +737,8 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		{filename: "sample_contains_only_added_deleted_files.diff", wantFileDiffs: 3},
 		{filename: "sample_onlyin_line_isnt_a_file_header.diff", wantFileDiffs: 4},
 		{filename: "sample_onlyin_complex_filenames.diff", wantFileDiffs: 3},
+		{filename: "sample_multi_file_minuses_pluses.diff", wantFileDiffs: 2},
+		{filename: "sample_multi_file_without_extended.diff", wantFileDiffs: 2},
 	}
 	for _, test := range tests {
 		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
