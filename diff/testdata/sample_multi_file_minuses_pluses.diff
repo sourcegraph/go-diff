@@ -1,0 +1,21 @@
+diff --git a/comment-last-line.sql b/comment-last-line.sql
+index 04a1655..97bd115 100644
+--- a/comment-last-line.sql
++++ b/comment-last-line.sql
+@@ -1,4 +1,4 @@
+ select 1;
++++ invalid SQL comment
+ select 2;
+ select 3;
+--- end of three queries
+diff --git a/query.sql b/query.sql
+index 9537d7b..234ef35 100644
+--- a/query.sql
++++ b/query.sql
+@@ -1,5 +1,4 @@
+ select 1;
+--- this is my query
+ select 2;
+ select 3;
+--- this is the last line
++++ invalid sql comment
