@@ -68,65 +68,42 @@ index 0000000..3be2928`,
 }
 
 func TestLineReader_ReadLine(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{
-			name:  "empty",
-			input: "",
-			want:  []string{},
-		},
-		{
-			name:  "single_line",
-			input: "@@ -0,0 +1,62 @@",
-			want:  []string{"@@ -0,0 +1,62 @@"},
-		},
-		{
-			name:  "single_lf_terminated_line",
-			input: "@@ -0,0 +1,62 @@\n",
-			want:  []string{"@@ -0,0 +1,62 @@"},
-		},
-		{
-			name:  "single_crlf_terminated_line",
-			input: "@@ -0,0 +1,62 @@\r\n",
-			want:  []string{"@@ -0,0 +1,62 @@"},
-		},
-		{
-			name: "multi_line",
-			input: `diff --git a/test.go b/test.go
+	input := `diff --git a/test.go b/test.go
 new file mode 100644
-index 0000000..3be2928`,
-			want: []string{
-				"diff --git a/test.go b/test.go",
-				"new file mode 100644",
-				"index 0000000..3be2928",
-			},
-		},
+index 0000000..3be2928
+
+
+`
+
+	in := newLineReader(strings.NewReader(input))
+	out := []string{}
+	for i := 0; i < 4; i++ {
+		l, err := in.readLine()
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, string(l))
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			in := newLineReader(strings.NewReader(test.input))
-			out := []string{}
-			for {
-				l, err := in.readLine()
-				if err == io.EOF {
-					break
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				out = append(out, string(l))
-			}
-			if !reflect.DeepEqual(test.want, out) {
-				t.Errorf("read lines not equal: want %v, got %v", test.want, out)
-			}
-		})
+
+	wantOut := strings.Split(input, "\n")[0:4]
+	if !reflect.DeepEqual(wantOut, out) {
+		t.Errorf("read lines not equal: want %v, got %v", wantOut, out)
+	}
+
+	_, err := in.readLine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.cachedNextLineErr != io.EOF {
+		t.Fatalf("lineReader has wrong cachedNextLineErr: %s", in.cachedNextLineErr)
+	}
+	_, err = in.readLine()
+	if err != io.EOF {
+		t.Fatalf("readLine did not return io.EOF: %s", err)
 	}
 }
 
-func TestLineReader_NextLineStartsWith(t *testing.T) {
+func TestLineReader_NextLine(t *testing.T) {
 	input := `aaa rest of line
 bbbrest of line
 ccc rest of line`
