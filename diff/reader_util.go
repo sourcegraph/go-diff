@@ -3,8 +3,11 @@ package diff
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 )
+
+var ErrLineReaderUninitialized = errors.New("line reader not initialized")
 
 func newLineReader(r io.Reader) *lineReader {
 	return &lineReader{reader: bufio.NewReader(r)}
@@ -43,6 +46,10 @@ func (l *lineReader) readLine() ([]byte, error) {
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
 func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
+	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+	}
+
 	return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
 }
 
@@ -51,7 +58,15 @@ func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
 //
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
+//
+// The lineReader MUST be initialized by calling readLine at least once before
+// calling nextLineStartsWith. Otherwise ErrLineReaderUninitialized will be
+// returned.
 func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
+	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+	}
+
 	next, err := l.reader.Peek(len(prefix))
 	return l.lineHasPrefix(next, prefix, err)
 }
