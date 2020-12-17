@@ -364,6 +364,19 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 	}
 	switch {
 	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
+		strings.HasPrefix(fd.Extended[1], "old mode ") && strings.HasPrefix(fd.Extended[2], "new mode "):
+
+		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
+		fd.OrigName, err = strconv.Unquote(names[0])
+		if err != nil {
+			fd.OrigName = names[0]
+		}
+		fd.NewName, err = strconv.Unquote(names[1])
+		if err != nil {
+			fd.NewName = names[1]
+		}
+		return true
+	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
 		strings.HasPrefix(fd.Extended[1], "new file mode "):
 
 		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
