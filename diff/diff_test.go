@@ -340,15 +340,15 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 		},
 		{
 			filename: "sample_multi_file_filemode_change.diff",
-			wantDiffs:[]*FileDiff{
+			wantDiffs: []*FileDiff{
 				{
 					OrigName: "a/sample.sh",
-					NewName: "b/sample.sh",
+					NewName:  "b/sample.sh",
 					Extended: []string{"diff --git a/sample.sh b/sample.sh", "old mode 100755", "new mode 100644"},
 				},
 				{
 					OrigName: "a/sample2.sh",
-					NewName: "b/sample2.sh",
+					NewName:  "b/sample2.sh",
 					Extended: []string{"diff --git a/sample2.sh b/sample2.sh", "old mode 100755", "new mode 100644"},
 				},
 			},
