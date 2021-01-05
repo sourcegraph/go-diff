@@ -151,6 +151,20 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			},
 		},
 		{
+			filename: "sample_file_extended_empty_mode_change.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/docs/index.md",
+				OrigTime: nil,
+				NewName:  "b/docs/index.md",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/docs/index.md b/docs/index.md",
+					"old mode 100644",
+					"new mode 100755",
+				},
+			},
+		},
+		{
 			filename: "sample_file_extended_empty_new_binary.diff",
 			wantDiff: &FileDiff{
 				OrigName: "/dev/null",
@@ -210,6 +224,23 @@ func TestParseFileDiffHeaders(t *testing.T) {
 			},
 		},
 		{
+			filename: "sample_file_extended_empty_rename_and_mode_change.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/textfile.txt",
+				OrigTime: nil,
+				NewName:  "b/textfile2.txt",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/textfile.txt b/textfile2.txt",
+					"old mode 100644",
+					"new mode 100755",
+					"similarity index 100%",
+					"rename from textfile.txt",
+					"rename to textfile2.txt",
+				},
+			},
+		},
+		{
 			filename: "quoted_filename.diff",
 			wantDiff: &FileDiff{
 				OrigName: "a/商品详情.txt",
@@ -241,19 +272,21 @@ func TestParseFileDiffHeaders(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diff, err := ParseFileDiff(diffData)
-		if err != nil {
-			t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diff, err := ParseFileDiff(diffData)
+			if err != nil {
+				t.Fatalf("%s: got ParseFileDiff error %v", test.filename, err)
+			}
 
-		diff.Hunks = nil
-		if got, want := diff, test.wantDiff; !cmp.Equal(got, want) {
-			t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
-		}
+			diff.Hunks = nil
+			if got, want := diff, test.wantDiff; !cmp.Equal(got, want) {
+				t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
+			}
+		})
 	}
 }
 
@@ -672,21 +705,23 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		diffs, err := ParseMultiFileDiff(diffData)
-		if err != nil {
-			t.Fatalf("%s: got ParseMultiFileDiff error %v", test.filename, err)
-		}
+		t.Run(test.filename, func(t *testing.T) {
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diffs, err := ParseMultiFileDiff(diffData)
+			if err != nil {
+				t.Fatalf("%s: got ParseMultiFileDiff error %v", test.filename, err)
+			}
 
-		for i := range diffs {
-			diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
-		}
-		if got, want := diffs, test.wantDiffs; !cmp.Equal(got, want) {
-			t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
-		}
+			for i := range diffs {
+				diffs[i].Hunks = nil // This test focuses on things other than hunks, so don't compare them.
+			}
+			if got, want := diffs, test.wantDiffs; !cmp.Equal(got, want) {
+				t.Errorf("%s:\n\ngot - want:\n%s", test.filename, cmp.Diff(want, got))
+			}
+		})
 	}
 }
 
