@@ -357,75 +357,58 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 // handleEmpty detects when FileDiff was an empty diff and will not have any hunks
 // that follow. It updates fd fields from the parsed extended headers.
 func handleEmpty(fd *FileDiff) (wasEmpty bool) {
-	var err error
 	lineCount := len(fd.Extended)
 	if lineCount > 0 && !strings.HasPrefix(fd.Extended[0], "diff --git ") {
 		return false
 	}
-	switch {
-	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
-		strings.HasPrefix(fd.Extended[1], "old mode ") && strings.HasPrefix(fd.Extended[2], "new mode "):
 
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName, err = strconv.Unquote(names[0])
-		if err != nil {
-			fd.OrigName = names[0]
-		}
-		fd.NewName, err = strconv.Unquote(names[1])
-		if err != nil {
-			fd.NewName = names[1]
-		}
-		return true
-	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
-		strings.HasPrefix(fd.Extended[1], "new file mode "):
+	lineHasPrefix := func(idx int, prefix string) bool {
+		return strings.HasPrefix(fd.Extended[idx], prefix)
+	}
 
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName = "/dev/null"
-		fd.NewName, err = strconv.Unquote(names[1])
-		if err != nil {
-			fd.NewName = names[1]
-		}
-		return true
-	case (lineCount == 3 || lineCount == 4 && strings.HasPrefix(fd.Extended[3], "Binary files ") || lineCount > 4 && strings.HasPrefix(fd.Extended[3], "GIT binary patch")) &&
-		strings.HasPrefix(fd.Extended[1], "deleted file mode "):
+	linesHavePrefixes := func(idx1 int, prefix1 string, idx2 int, prefix2 string) bool {
+		return lineHasPrefix(idx1, prefix1) && lineHasPrefix(idx2, prefix2)
+	}
 
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName, err = strconv.Unquote(names[0])
-		if err != nil {
-			fd.OrigName = names[0]
-		}
-		fd.NewName = "/dev/null"
-		return true
-	case lineCount == 4 && strings.HasPrefix(fd.Extended[2], "rename from ") && strings.HasPrefix(fd.Extended[3], "rename to "):
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName, err = strconv.Unquote(names[0])
-		if err != nil {
-			fd.OrigName = names[0]
-		}
-		fd.NewName, err = strconv.Unquote(names[1])
-		if err != nil {
-			fd.NewName = names[1]
-		}
-		return true
-	case lineCount == 6 && strings.HasPrefix(fd.Extended[5], "Binary files ") && strings.HasPrefix(fd.Extended[2], "rename from ") && strings.HasPrefix(fd.Extended[3], "rename to "):
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName = names[0]
-		fd.NewName = names[1]
-		return true
-	case lineCount == 3 && strings.HasPrefix(fd.Extended[2], "Binary files ") || lineCount > 3 && strings.HasPrefix(fd.Extended[2], "GIT binary patch"):
-		names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-		fd.OrigName, err = strconv.Unquote(names[0])
-		if err != nil {
-			fd.OrigName = names[0]
-		}
-		fd.NewName, err = strconv.Unquote(names[1])
-		if err != nil {
-			fd.NewName = names[1]
-		}
-		return true
-	default:
+	isRename := (lineCount == 4 && linesHavePrefixes(2, "rename from ", 3, "rename to ")) ||
+		(lineCount == 6 && linesHavePrefixes(2, "rename from ", 3, "rename to ") && lineHasPrefix(5, "Binary files ")) ||
+		(lineCount == 6 && linesHavePrefixes(1, "old mode ", 2, "new mode ") && linesHavePrefixes(4, "rename from ", 5, "rename to "))
+
+	isDeletedFile := (lineCount == 3 || lineCount == 4 && lineHasPrefix(3, "Binary files ") || lineCount > 4 && lineHasPrefix(3, "GIT binary patch")) &&
+		lineHasPrefix(1, "deleted file mode ")
+
+	isNewFile := (lineCount == 3 || lineCount == 4 && lineHasPrefix(3, "Binary files ") || lineCount > 4 && lineHasPrefix(3, "GIT binary patch")) &&
+		lineHasPrefix(1, "new file mode ")
+
+	isModeChange := lineCount == 3 && linesHavePrefixes(1, "old mode ", 2, "new mode ")
+
+	isBinaryPatch := lineCount == 3 && lineHasPrefix(2, "Binary files ") || lineCount > 3 && lineHasPrefix(2, "GIT binary patch")
+
+	if !isModeChange && !isRename && !isBinaryPatch && !isNewFile && !isDeletedFile {
 		return false
 	}
+
+	names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
+
+	var err error
+	fd.OrigName, err = strconv.Unquote(names[0])
+	if err != nil {
+		fd.OrigName = names[0]
+	}
+	fd.NewName, err = strconv.Unquote(names[1])
+	if err != nil {
+		fd.NewName = names[1]
+	}
+
+	if isNewFile {
+		fd.OrigName = "/dev/null"
+	}
+
+	if isDeletedFile {
+		fd.NewName = "/dev/null"
+	}
+
+	return true
 }
 
 var (

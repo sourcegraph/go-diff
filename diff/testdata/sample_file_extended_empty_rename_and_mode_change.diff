@@ -1,0 +1,6 @@
+diff --git a/textfile.txt b/textfile2.txt
+old mode 100644
+new mode 100755
+similarity index 100%
+rename from textfile.txt
+rename to textfile2.txt
