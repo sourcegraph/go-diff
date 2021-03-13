@@ -2,6 +2,7 @@ package diff
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -815,6 +816,52 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		if !bytes.Equal(printed, diffData) {
 			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
 		}
+	}
+}
+
+func TestParseMultiFileDiffAndPrintMultiFileDiffIncludingTrailingContent(t *testing.T) {
+	testInput, err := ioutil.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content.diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedDiffs, err := ioutil.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content_diffsonly.diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diffReader := NewMultiFileDiffReader(bytes.NewReader(testInput))
+	var diffs []*FileDiff
+	trailingContent := ""
+	for {
+		var fd *FileDiff
+		var err error
+		fd, trailingContent, err = diffReader.ReadFileWithTrailingContent()
+		if fd != nil {
+			diffs = append(diffs, fd)
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	if len(diffs) != 2 {
+		t.Errorf("expected 2 diffs, got %d", len(diffs))
+	}
+
+	printed, err := PrintMultiFileDiff(diffs)
+	if err != nil {
+		t.Errorf("PrintMultiFileDiff: %s", err)
+	}
+	if !bytes.Equal(printed, expectedDiffs) {
+		t.Errorf("printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output - Original:\n%s", cmp.Diff(expectedDiffs, printed))
+	}
+
+	expectedTrailingContent := "some trailing content"
+	if trailingContent != expectedTrailingContent {
+		t.Errorf("expected trailing content %s, got %s", expectedTrailingContent, trailingContent)
 	}
 }
 

@@ -46,6 +46,14 @@ type MultiFileDiffReader struct {
 // all hunks) from r. If there are no more files in the diff, it
 // returns error io.EOF.
 func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
+	fd, _, err := r.ReadFileWithTrailingContent()
+	return fd, err
+}
+
+// ReadFileWithTrailingContent reads the next file unified diff (including
+// headers and all hunks) from r, also returning any trailing content. If there
+// are no more files in the diff, it returns error io.EOF.
+func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, error) {
 	fr := &FileDiffReader{
 		line:           r.line,
 		offset:         r.offset,
@@ -59,23 +67,33 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 		switch e := err.(type) {
 		case *ParseError:
 			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
-				return nil, io.EOF
+				// Any non-diff content preceding a valid diff is included in the
+				// extended headers of the following diff. In this way, mixed diff /
+				// non-diff content can be parsed. Trailing non-diff content is
+				// different: it doesn't make sense to return a FileDiff with only
+				// extended headers populated. Instead, we return any trailing content
+				// in case the caller needs it.
+				trailing := ""
+				if fd != nil {
+					trailing = strings.Join(fd.Extended, "\n")
+				}
+				return nil, trailing, io.EOF
 			}
-			return nil, err
+			return nil, "", err
 
 		case OverflowError:
 			r.nextFileFirstLine = []byte(e)
-			return fd, nil
+			return fd, "", nil
 
 		default:
-			return nil, err
+			return nil, "", err
 		}
 	}
 
 	// FileDiff is added/deleted file
 	// No further collection of hunks needed
 	if fd.NewName == "" {
-		return fd, nil
+		return fd, "", nil
 	}
 
 	// Before reading hunks, check to see if there are any. If there
@@ -87,7 +105,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 	hr := fr.HunksReader()
 	line, err := r.reader.readLine()
 	if err != nil && err != io.EOF {
-		return fd, err
+		return fd, "", err
 	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
 	if bytes.HasPrefix(line, hunkPrefix) {
@@ -101,10 +119,10 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 					// This just means we finished reading the hunks for the
 					// current file. See the ErrBadHunkLine doc for more info.
 					r.nextFileFirstLine = e.Line
-					return fd, nil
+					return fd, "", nil
 				}
 			}
-			return nil, err
+			return nil, "", err
 		}
 	} else {
 		// There weren't any hunks, so that line we peeked ahead at
@@ -112,7 +130,7 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 		r.nextFileFirstLine = line
 	}
 
-	return fd, nil
+	return fd, "", nil
 }
 
 // ReadAllFiles reads all file unified diffs (including headers and all
