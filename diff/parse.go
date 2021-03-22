@@ -417,6 +417,9 @@ func parseDiffGitArgs(diffArgs string) (bool, string, string) {
 
 		secondSpace := strings.IndexByte(diffArgs[firstSpace+1:], ' ')
 		if secondSpace == -1 {
+			if diffArgs[firstSpace+1] == '"' {
+				return false, "", ""
+			}
 			return true, diffArgs[:firstSpace], diffArgs[firstSpace+1:]
 		}
 

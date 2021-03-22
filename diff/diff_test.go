@@ -29,7 +29,7 @@ func init() {
 	time.Local = time.UTC
 }
 
-func TestReadQuotedFilename(t *testing.T) {
+func TestReadQuotedFilename_Success(t *testing.T) {
 	tests := []string{
 		`""`, "", "",
 		`"aaa"`, "aaa", "",
@@ -50,7 +50,21 @@ func TestReadQuotedFilename(t *testing.T) {
 	}
 }
 
-func TestParseDiffGitArgs(t *testing.T) {
+func TestReadQuotedFilename_Error(t *testing.T) {
+	tests := []string{
+		`"`,
+		`"\"`,
+		`"\xxx"`,
+	}
+	for _, input := range tests {
+		_, _, err := readQuotedFilename(input)
+		if err == nil {
+			t.Errorf("readQuotedFilename(`%s`): expected error", input)
+		}
+	}
+}
+
+func TestParseDiffGitArgs_Success(t *testing.T) {
 	tests := []string{
 		`aaa bbb`, "aaa", "bbb",
 		`"aaa" bbb`, "aaa", "bbb",
@@ -68,6 +82,28 @@ func TestParseDiffGitArgs(t *testing.T) {
 			t.Errorf("`diff --git %s`: expected success", input)
 		} else if first != tests[i+1] || second != tests[i+2] {
 			t.Errorf("`diff --git %s`: expected `%s` and `%s`, got `%s` and `%s`", input, tests[i+1], tests[i+2], first, second)
+		}
+	}
+}
+
+func TestParseDiffGitArgs_Unsuccessful(t *testing.T) {
+	tests := []string{
+		``,
+		`hello_world.txt`,
+		`word `,
+		` word`,
+		`"a/bad_quoting b/bad_quoting`,
+		`a/bad_quoting "b/bad_quoting`,
+		`a/bad_quoting b/bad_quoting"`,
+		`"a/bad_quoting b/bad_quoting"`,
+		`"a/bad""b/bad"`,
+		`"a/bad" "b/bad" "c/bad"`,
+		`a/bad "b/bad" "c/bad"`,
+	}
+	for _, input := range tests {
+		success, first, second := parseDiffGitArgs(input)
+		if success {
+			t.Errorf("`diff --git %s`: expected unsuccessful; got `%s` and `%s`", input, first, second)
 		}
 	}
 }
