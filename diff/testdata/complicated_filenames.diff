@@ -1,0 +1,26 @@
+diff --git a/new empty file with spaces b/new empty file with spaces
+new file mode 100644
+index 0000000..e69de29
+diff --git a/new file with text b/new file with text
+new file mode 100644
+index 0000000..c3ed4be
+--- /dev/null
++++ b/new file with text
+@@ -0,0 +1 @@
++new file with text
+diff --git a/existing file with spaces b/new file with spaces
+similarity index 100%
+copy from existing file with spaces
+copy to new file with spaces
+diff --git a/existing file with spaces "b/new, complicated\nfilen\303\270me"
+similarity index 100%
+copy from existing file with spaces
+copy to "new, complicated\nfilen\303\270me"
+diff --git a/existing file with spaces "b/new \"complicated\" filename"
+similarity index 100%
+copy from existing file with spaces
+copy to "new \"complicated\" filename"
+diff --git "a/existing \"complicated\" filename" b/new, simpler filename
+similarity index 100%
+copy from "existing \"complicated\" filename"
+copy to new, simpler filename

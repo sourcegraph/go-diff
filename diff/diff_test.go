@@ -29,6 +29,49 @@ func init() {
 	time.Local = time.UTC
 }
 
+func TestReadQuotedFilename(t *testing.T) {
+	tests := []string{
+		`""`, "", "",
+		`"aaa"`, "aaa", "",
+		`"aaa" bbb`, "aaa", " bbb",
+		`"\""`, "\"", "",
+		`"uh \"oh\""`, "uh \"oh\"", "",
+		`"uh \\"oh\\""`, "uh \\", `oh\\""`,
+		`"uh \\\"oh\\\""`, "uh \\\"oh\\\"", "",
+	}
+	for i := 0; i < len(tests); i += 3 {
+		input := tests[i]
+		value, remainder, err := readQuotedFilename(input)
+		if err != nil {
+			t.Errorf("readQuotedFilename(`%s`): expected success, got '%s'", input, err)
+		} else if value != tests[i+1] || remainder != tests[i+2] {
+			t.Errorf("readQuotedFilename(`%s`): expected `%s` and `%s`, got `%s` and `%s`", input, tests[i+1], tests[i+2], value, remainder)
+		}
+	}
+}
+
+func TestParseDiffGitArgs(t *testing.T) {
+	tests := []string{
+		`aaa bbb`, "aaa", "bbb",
+		`"aaa" bbb`, "aaa", "bbb",
+		`aaa "bbb"`, "aaa", "bbb",
+		`"aaa" "bbb"`, "aaa", "bbb",
+		`1/a 2/z`, "1/a", "2/z",
+		`1/hello world 2/hello world`, "1/hello world", "2/hello world",
+		`"new\nline" and spaces`, "new\nline", "and spaces",
+		`a/existing file with spaces "b/new, complicated\nfilen\303\270me"`, "a/existing file with spaces", "b/new, complicated\nfilen\303\270me",
+	}
+	for i := 0; i < len(tests); i += 3 {
+		input := tests[i]
+		success, first, second := parseDiffGitArgs(input)
+		if !success {
+			t.Errorf("`diff --git %s`: expected success", input)
+		} else if first != tests[i+1] || second != tests[i+2] {
+			t.Errorf("`diff --git %s`: expected `%s` and `%s`, got `%s` and `%s`", input, tests[i+1], tests[i+2], first, second)
+		}
+	}
+}
+
 func TestParseHunkNoChunksize(t *testing.T) {
 	filename := "sample_no_chunksize.diff"
 	diffData, err := ioutil.ReadFile(filepath.Join("testdata", filename))
@@ -701,6 +744,69 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 					NewName:  "source_1_c/file_2.txt",
 					NewTime:  nil,
 					Extended: nil,
+				},
+			},
+		},
+		{
+			filename: "complicated_filenames.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "/dev/null",
+					NewName:  "b/new empty file with spaces",
+					Extended: []string{
+						"diff --git a/new empty file with spaces b/new empty file with spaces",
+						"new file mode 100644",
+						"index 0000000..e69de29",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					NewName:  "b/new file with text",
+					Extended: []string{
+						"diff --git a/new file with text b/new file with text",
+						"new file mode 100644",
+						"index 0000000..c3ed4be",
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  "b/new file with spaces",
+					Extended: []string{
+						"diff --git a/existing file with spaces b/new file with spaces",
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						"copy to new file with spaces",
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  "b/new, complicated\nfilenøme",
+					Extended: []string{
+						`diff --git a/existing file with spaces "b/new, complicated\nfilen\303\270me"`,
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						`copy to "new, complicated\nfilen\303\270me"`,
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  `b/new "complicated" filename`,
+					Extended: []string{
+						`diff --git a/existing file with spaces "b/new \"complicated\" filename"`,
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						`copy to "new \"complicated\" filename"`,
+					},
+				},
+				{
+					OrigName: `a/existing "complicated" filename`,
+					NewName:  "b/new, simpler filename",
+					Extended: []string{
+						`diff --git "a/existing \"complicated\" filename" b/new, simpler filename`,
+						"similarity index 100%",
+						`copy from "existing \"complicated\" filename"`,
+						"copy to new, simpler filename",
+					},
 				},
 			},
 		},

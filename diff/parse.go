@@ -372,6 +372,101 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 	}
 }
 
+// readQuotedFilename extracts a quoted filename from the beginning of a string,
+// returning the unquoted filename and any remaining text after the filename.
+func readQuotedFilename(text string) (value string, remainder string, err error) {
+	if text[0] != '"' {
+		panic("caller must ensure filename is quoted! " + text)
+	}
+
+	// The end quote is the first quote NOT preceeded by an uneven number of backslashes.
+	var i, j int
+	for i = 1; i < len(text); i++ {
+		if text[i] == '"' {
+			// walk backwards and find first non-backslash
+			for j = i - 1; j > 0 && text[j] == '\\'; j-- {
+			}
+			numberOfBackslashes := i - j - 1
+			if numberOfBackslashes%2 == 0 {
+				break
+			}
+		}
+	}
+	if i == len(text) {
+		return "", "", fmt.Errorf(`end of string found while searching for '"': %s`, text)
+	}
+
+	value, err = strconv.Unquote(text[:i+1])
+	remainder = text[i+1:]
+	return
+}
+
+// parseDiffGitArgs extracts the two filenames from a 'diff --git' line.
+func parseDiffGitArgs(diffArgs string) (bool, string, string) {
+	length := len(diffArgs)
+	if length < 3 {
+		return false, "", ""
+	}
+
+	if diffArgs[0] != '"' && diffArgs[length-1] != '"' {
+		// Both filenames are unquoted.
+		firstSpace := strings.IndexByte(diffArgs, ' ')
+		if firstSpace <= 0 || firstSpace == length-1 {
+			return false, "", ""
+		}
+
+		secondSpace := strings.IndexByte(diffArgs[firstSpace+1:], ' ')
+		if secondSpace == -1 {
+			return true, diffArgs[:firstSpace], diffArgs[firstSpace+1:]
+		}
+
+		// One or both filenames contain a space, but the names are
+		// unquoted. Here, the 'diff --git' syntax is ambiguous, and
+		// we have to obtain the filenames elsewhere (e.g. from the
+		// chunk headers or extended headers). HOWEVER, if the file
+		// is newly created and empty, there IS no other place to
+		// find the filename. In this case, the two filenames are
+		// identical (except for the leading 'a/' prefix), and we have
+		// to handle that case here.
+		first := diffArgs[:length/2]
+		second := diffArgs[length/2+1:]
+		if len(first) >= 3 && length%2 == 1 && first[1] == '/' && first[1:] == second[1:] {
+			return true, first, second
+		}
+
+		// The syntax is (unfortunately) valid, but we could not extract
+		// the filenames.
+		return true, "", ""
+	}
+
+	if diffArgs[0] == '"' {
+		first, remainder, err := readQuotedFilename(diffArgs)
+		if err != nil || len(remainder) < 2 || remainder[0] != ' ' {
+			return false, "", ""
+		}
+		if remainder[1] == '"' {
+			second, remainder, err := readQuotedFilename(remainder[1:])
+			if remainder != "" || err != nil {
+				return false, "", ""
+			}
+			return true, first, second
+		}
+		return true, first, remainder[1:]
+	}
+
+	// In this case, second argument MUST be quoted (or it's a syntax error)
+	i := strings.IndexByte(diffArgs, '"')
+	if i == -1 || i+2 >= length || diffArgs[i-1] != ' ' {
+		return false, "", ""
+	}
+
+	second, remainder, err := readQuotedFilename(diffArgs[i:])
+	if remainder != "" || err != nil {
+		return false, "", ""
+	}
+	return true, diffArgs[:i-1], second
+}
+
 // handleEmpty detects when FileDiff was an empty diff and will not have any hunks
 // that follow. It updates fd fields from the parsed extended headers.
 func handleEmpty(fd *FileDiff) (wasEmpty bool) {
@@ -388,6 +483,10 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 		return lineHasPrefix(idx1, prefix1) && lineHasPrefix(idx2, prefix2)
 	}
 
+	isCopy := (lineCount == 4 && linesHavePrefixes(2, "copy from ", 3, "copy to ")) ||
+		(lineCount == 6 && linesHavePrefixes(2, "copy from ", 3, "copy to ") && lineHasPrefix(5, "Binary files ")) ||
+		(lineCount == 6 && linesHavePrefixes(1, "old mode ", 2, "new mode ") && linesHavePrefixes(4, "copy from ", 5, "copy to "))
+
 	isRename := (lineCount == 4 && linesHavePrefixes(2, "rename from ", 3, "rename to ")) ||
 		(lineCount == 6 && linesHavePrefixes(2, "rename from ", 3, "rename to ") && lineHasPrefix(5, "Binary files ")) ||
 		(lineCount == 6 && linesHavePrefixes(1, "old mode ", 2, "new mode ") && linesHavePrefixes(4, "rename from ", 5, "rename to "))
@@ -402,22 +501,12 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 
 	isBinaryPatch := lineCount == 3 && lineHasPrefix(2, "Binary files ") || lineCount > 3 && lineHasPrefix(2, "GIT binary patch")
 
-	if !isModeChange && !isRename && !isBinaryPatch && !isNewFile && !isDeletedFile {
+	if !isModeChange && !isCopy && !isRename && !isBinaryPatch && !isNewFile && !isDeletedFile {
 		return false
 	}
 
-	names := strings.SplitN(fd.Extended[0][len("diff --git "):], " ", 2)
-
-	var err error
-	fd.OrigName, err = strconv.Unquote(names[0])
-	if err != nil {
-		fd.OrigName = names[0]
-	}
-	fd.NewName, err = strconv.Unquote(names[1])
-	if err != nil {
-		fd.NewName = names[1]
-	}
-
+	var success bool
+	success, fd.OrigName, fd.NewName = parseDiffGitArgs(fd.Extended[0][len("diff --git "):])
 	if isNewFile {
 		fd.OrigName = "/dev/null"
 	}
@@ -426,7 +515,39 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 		fd.NewName = "/dev/null"
 	}
 
-	return true
+	// For ambiguous 'diff --git' lines, try to reconstruct filenames using extended headers.
+	if success && (isCopy || isRename) && fd.OrigName == "" && fd.NewName == "" {
+		diffArgs := fd.Extended[0][len("diff --git "):]
+
+		reconstruct := func(header string, prefix string, whichFile int, result *string) bool {
+			if !strings.HasPrefix(header, prefix) {
+				return false
+			}
+			rawFilename := header[len(prefix):]
+
+			// extract the filename prefix (e.g. "a/") from the 'diff --git' line.
+			var prefixLetterIndex int
+			if whichFile == 1 {
+				prefixLetterIndex = 0
+			} else if whichFile == 2 {
+				prefixLetterIndex = len(diffArgs) - len(rawFilename) - 2
+			}
+			if prefixLetterIndex < 0 || diffArgs[prefixLetterIndex+1] != '/' {
+				return false
+			}
+
+			*result = diffArgs[prefixLetterIndex:prefixLetterIndex+2] + rawFilename
+			return true
+		}
+
+		for _, header := range fd.Extended {
+			_ = reconstruct(header, "copy from ", 1, &fd.OrigName) ||
+				reconstruct(header, "copy to ", 2, &fd.NewName) ||
+				reconstruct(header, "rename from ", 1, &fd.OrigName) ||
+				reconstruct(header, "rename to ", 2, &fd.NewName)
+		}
+	}
+	return success
 }
 
 var (
