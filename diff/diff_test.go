@@ -3,7 +3,6 @@ package diff
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -31,7 +30,7 @@ func init() {
 
 func TestParseHunkNoChunksize(t *testing.T) {
 	filename := "sample_no_chunksize.diff"
-	diffData, err := ioutil.ReadFile(filepath.Join("testdata", filename))
+	diffData, err := os.ReadFile(filepath.Join("testdata", filename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +77,7 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		{filename: "sample_hunk_lines_start_with_minuses_pluses.diff"},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		diffData, err := os.ReadFile(filepath.Join("testdata", test.filename))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -274,7 +273,7 @@ func TestParseFileDiffHeaders(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.filename, func(t *testing.T) {
-			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			diffData, err := os.ReadFile(filepath.Join("testdata", test.filename))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -707,7 +706,7 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.filename, func(t *testing.T) {
-			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			diffData, err := os.ReadFile(filepath.Join("testdata", test.filename))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -746,7 +745,7 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		diffData, err := os.ReadFile(filepath.Join("testdata", test.filename))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -792,7 +791,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		{filename: "sample_multi_file_without_extended.diff", wantFileDiffs: 2},
 	}
 	for _, test := range tests {
-		diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+		diffData, err := os.ReadFile(filepath.Join("testdata", test.filename))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -820,11 +819,11 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 }
 
 func TestParseMultiFileDiffAndPrintMultiFileDiffIncludingTrailingContent(t *testing.T) {
-	testInput, err := ioutil.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content.diff"))
+	testInput, err := os.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content.diff"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedDiffs, err := ioutil.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content_diffsonly.diff"))
+	expectedDiffs, err := os.ReadFile(filepath.Join("testdata", "sample_multi_file_trailing_content_diffsonly.diff"))
 	if err != nil {
 		t.Fatal(err)
 	}
