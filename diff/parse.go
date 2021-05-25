@@ -375,58 +375,56 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 // readQuotedFilename extracts a quoted filename from the beginning of a string,
 // returning the unquoted filename and any remaining text after the filename.
 func readQuotedFilename(text string) (value string, remainder string, err error) {
-	if text[0] != '"' {
-		panic("caller must ensure filename is quoted! " + text)
+	if text == "" || text[0] != '"' {
+		return "", "", fmt.Errorf(`string must start with a '"': %s`, text)
 	}
 
 	// The end quote is the first quote NOT preceeded by an uneven number of backslashes.
-	var i, j int
-	for i = 1; i < len(text); i++ {
-		if text[i] == '"' {
-			// walk backwards and find first non-backslash
-			for j = i - 1; j > 0 && text[j] == '\\'; j-- {
-			}
-			numberOfBackslashes := i - j - 1
-			if numberOfBackslashes%2 == 0 {
-				break
-			}
+	numberOfBackslashes := 0
+	for i, c := range text {
+		if c == '"' && i > 0 && numberOfBackslashes%2 == 0 {
+			value, err = strconv.Unquote(text[:i+1])
+			remainder = text[i+1:]
+			return
+		} else if c == '\\' {
+			numberOfBackslashes++
+		} else {
+			numberOfBackslashes = 0
 		}
 	}
-	if i == len(text) {
-		return "", "", fmt.Errorf(`end of string found while searching for '"': %s`, text)
-	}
-
-	value, err = strconv.Unquote(text[:i+1])
-	remainder = text[i+1:]
-	return
+	return "", "", fmt.Errorf(`end of string found while searching for '"': %s`, text)
 }
 
 // parseDiffGitArgs extracts the two filenames from a 'diff --git' line.
-func parseDiffGitArgs(diffArgs string) (bool, string, string) {
+// Returns false on syntax error, true if syntax is valid. Even with a
+// valid syntax, it may be impossible to extract filenames; if so, the
+// function returns ("", "", true).
+func parseDiffGitArgs(diffArgs string) (string, string, bool) {
 	length := len(diffArgs)
 	if length < 3 {
-		return false, "", ""
+		return "", "", false
 	}
 
 	if diffArgs[0] != '"' && diffArgs[length-1] != '"' {
 		// Both filenames are unquoted.
 		firstSpace := strings.IndexByte(diffArgs, ' ')
 		if firstSpace <= 0 || firstSpace == length-1 {
-			return false, "", ""
+			return "", "", false
 		}
 
 		secondSpace := strings.IndexByte(diffArgs[firstSpace+1:], ' ')
 		if secondSpace == -1 {
 			if diffArgs[firstSpace+1] == '"' {
-				return false, "", ""
+				// The second filename begins with '"', but doesn't end with one.
+				return "", "", false
 			}
-			return true, diffArgs[:firstSpace], diffArgs[firstSpace+1:]
+			return diffArgs[:firstSpace], diffArgs[firstSpace+1:], true
 		}
 
 		// One or both filenames contain a space, but the names are
 		// unquoted. Here, the 'diff --git' syntax is ambiguous, and
 		// we have to obtain the filenames elsewhere (e.g. from the
-		// chunk headers or extended headers). HOWEVER, if the file
+		// hunk headers or extended headers). HOWEVER, if the file
 		// is newly created and empty, there IS no other place to
 		// find the filename. In this case, the two filenames are
 		// identical (except for the leading 'a/' prefix), and we have
@@ -434,40 +432,40 @@ func parseDiffGitArgs(diffArgs string) (bool, string, string) {
 		first := diffArgs[:length/2]
 		second := diffArgs[length/2+1:]
 		if len(first) >= 3 && length%2 == 1 && first[1] == '/' && first[1:] == second[1:] {
-			return true, first, second
+			return first, second, true
 		}
 
 		// The syntax is (unfortunately) valid, but we could not extract
 		// the filenames.
-		return true, "", ""
+		return "", "", true
 	}
 
 	if diffArgs[0] == '"' {
 		first, remainder, err := readQuotedFilename(diffArgs)
 		if err != nil || len(remainder) < 2 || remainder[0] != ' ' {
-			return false, "", ""
+			return "", "", false
 		}
 		if remainder[1] == '"' {
 			second, remainder, err := readQuotedFilename(remainder[1:])
 			if remainder != "" || err != nil {
-				return false, "", ""
+				return "", "", false
 			}
-			return true, first, second
+			return first, second, true
 		}
-		return true, first, remainder[1:]
+		return first, remainder[1:], true
 	}
 
 	// In this case, second argument MUST be quoted (or it's a syntax error)
 	i := strings.IndexByte(diffArgs, '"')
 	if i == -1 || i+2 >= length || diffArgs[i-1] != ' ' {
-		return false, "", ""
+		return "", "", false
 	}
 
 	second, remainder, err := readQuotedFilename(diffArgs[i:])
 	if remainder != "" || err != nil {
-		return false, "", ""
+		return "", "", false
 	}
-	return true, diffArgs[:i-1], second
+	return diffArgs[:i-1], second, true
 }
 
 // handleEmpty detects when FileDiff was an empty diff and will not have any hunks
@@ -509,7 +507,7 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 	}
 
 	var success bool
-	success, fd.OrigName, fd.NewName = parseDiffGitArgs(fd.Extended[0][len("diff --git "):])
+	fd.OrigName, fd.NewName, success = parseDiffGitArgs(fd.Extended[0][len("diff --git "):])
 	if isNewFile {
 		fd.OrigName = "/dev/null"
 	}
@@ -522,9 +520,9 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 	if success && (isCopy || isRename) && fd.OrigName == "" && fd.NewName == "" {
 		diffArgs := fd.Extended[0][len("diff --git "):]
 
-		reconstruct := func(header string, prefix string, whichFile int, result *string) bool {
+		tryReconstruct := func(header string, prefix string, whichFile int, result *string) {
 			if !strings.HasPrefix(header, prefix) {
-				return false
+				return
 			}
 			rawFilename := header[len(prefix):]
 
@@ -536,18 +534,17 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 				prefixLetterIndex = len(diffArgs) - len(rawFilename) - 2
 			}
 			if prefixLetterIndex < 0 || diffArgs[prefixLetterIndex+1] != '/' {
-				return false
+				return
 			}
 
 			*result = diffArgs[prefixLetterIndex:prefixLetterIndex+2] + rawFilename
-			return true
 		}
 
 		for _, header := range fd.Extended {
-			_ = reconstruct(header, "copy from ", 1, &fd.OrigName) ||
-				reconstruct(header, "copy to ", 2, &fd.NewName) ||
-				reconstruct(header, "rename from ", 1, &fd.OrigName) ||
-				reconstruct(header, "rename to ", 2, &fd.NewName)
+			tryReconstruct(header, "copy from ", 1, &fd.OrigName)
+			tryReconstruct(header, "copy to ", 2, &fd.NewName)
+			tryReconstruct(header, "rename from ", 1, &fd.OrigName)
+			tryReconstruct(header, "rename to ", 2, &fd.NewName)
 		}
 	}
 	return success
