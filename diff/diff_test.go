@@ -704,6 +704,69 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "complicated_filenames.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "/dev/null",
+					NewName:  "b/new empty file with spaces",
+					Extended: []string{
+						"diff --git a/new empty file with spaces b/new empty file with spaces",
+						"new file mode 100644",
+						"index 0000000..e69de29",
+					},
+				},
+				{
+					OrigName: "/dev/null",
+					NewName:  "b/new file with text",
+					Extended: []string{
+						"diff --git a/new file with text b/new file with text",
+						"new file mode 100644",
+						"index 0000000..c3ed4be",
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  "b/new file with spaces",
+					Extended: []string{
+						"diff --git a/existing file with spaces b/new file with spaces",
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						"copy to new file with spaces",
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  "b/new, complicated\nfilenøme",
+					Extended: []string{
+						`diff --git a/existing file with spaces "b/new, complicated\nfilen\303\270me"`,
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						`copy to "new, complicated\nfilen\303\270me"`,
+					},
+				},
+				{
+					OrigName: "a/existing file with spaces",
+					NewName:  `b/new "complicated" filename`,
+					Extended: []string{
+						`diff --git a/existing file with spaces "b/new \"complicated\" filename"`,
+						"similarity index 100%",
+						"copy from existing file with spaces",
+						`copy to "new \"complicated\" filename"`,
+					},
+				},
+				{
+					OrigName: `a/existing "complicated" filename`,
+					NewName:  "b/new, simpler filename",
+					Extended: []string{
+						`diff --git "a/existing \"complicated\" filename" b/new, simpler filename`,
+						"similarity index 100%",
+						`copy from "existing \"complicated\" filename"`,
+						"copy to new, simpler filename",
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.filename, func(t *testing.T) {
