@@ -1,0 +1,5 @@
+diff --git a/data/foo.txt b/data/bar.txt
+similarity index 100%
+rename from data/foo.txt
+rename to data/bar.txt
+Binary files a/data/foo.txt and b/data/bar.txt differ
