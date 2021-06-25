@@ -271,6 +271,22 @@ func TestParseFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "sample_file_extended_binary_rename_no_index.diff",
+			wantDiff: &FileDiff{
+				OrigName: "a/data/foo.txt",
+				OrigTime: nil,
+				NewName:  "b/data/bar.txt",
+				NewTime:  nil,
+				Extended: []string{
+					"diff --git a/data/foo.txt b/data/bar.txt",
+					"similarity index 100%",
+					"rename from data/foo.txt",
+					"rename to data/bar.txt",
+					"Binary files a/data/foo.txt and b/data/bar.txt differ",
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.filename, func(t *testing.T) {
