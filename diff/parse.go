@@ -217,15 +217,18 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	}
 
 	var origTime, newTime *time.Time
-	fd.OrigName, fd.NewName, origTime, newTime, err = r.ReadFileHeaders()
+	var origTZ, newTZ bool
+	fd.OrigName, fd.NewName, origTime, newTime, origTZ, newTZ, err = r.ReadFileHeaders()
 	if err != nil {
 		return nil, err
 	}
 	if origTime != nil {
 		fd.OrigTime = origTime
+		fd.OrigTimeHasTZ = origTZ
 	}
 	if newTime != nil {
 		fd.NewTime = newTime
+		fd.NewTimeHasTZ = newTZ
 	}
 
 	return fd, nil
@@ -247,22 +250,21 @@ func (r *FileDiffReader) HunksReader() *HunksReader {
 // start with "---" and "+++" with the orig/new file names and
 // timestamps). Or which starts with "Only in " with dir path and filename.
 // "Only in" message is supported in POSIX locale: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/diff.html#tag_20_34_10
-func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimestamp, newTimestamp *time.Time, err error) {
+func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimestamp, newTimestamp *time.Time, origTZ, newTZ bool, err error) {
 	if r.fileHeaderLine != nil {
 		if isOnlyMessage, source, filename := parseOnlyInMessage(r.fileHeaderLine); isOnlyMessage {
 			return filepath.Join(string(source), string(filename)),
-				"", nil, nil, nil
+				"", nil, nil, false, false, nil
 		}
 	}
-
-	origName, origTimestamp, err = r.readOneFileHeader([]byte("--- "))
+	origName, origTimestamp, origTZ, err = r.readOneFileHeader([]byte("--- "))
 	if err != nil {
-		return "", "", nil, nil, err
+		return "", "", nil, nil, false, false, err
 	}
 
-	newName, newTimestamp, err = r.readOneFileHeader([]byte("+++ "))
+	newName, newTimestamp, newTZ, err = r.readOneFileHeader([]byte("+++ "))
 	if err != nil {
-		return "", "", nil, nil, err
+		return "", "", nil, nil, false, false, err
 	}
 
 	unquotedOrigName, err := strconv.Unquote(origName)
@@ -274,21 +276,21 @@ func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimest
 		newName = unquotedNewName
 	}
 
-	return origName, newName, origTimestamp, newTimestamp, nil
+	return origName, newName, origTimestamp, newTimestamp, origTZ, newTZ, nil
 }
 
 // readOneFileHeader reads one of the file headers (prefix should be
 // either "+++ " or "--- ").
-func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, timestamp *time.Time, err error) {
+func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, timestamp *time.Time, hadTZ bool, err error) {
 	var line []byte
 
 	if r.fileHeaderLine == nil {
 		var err error
 		line, err = r.reader.readLine()
 		if err == io.EOF {
-			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
+			return "", nil, false, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
-			return "", nil, err
+			return "", nil, false, err
 		}
 	} else {
 		line = r.fileHeaderLine
@@ -296,7 +298,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	}
 
 	if !bytes.HasPrefix(line, prefix) {
-		return "", nil, &ParseError{r.line, r.offset, ErrBadFileHeader}
+		return "", nil, false, &ParseError{r.line, r.offset, ErrBadFileHeader}
 	}
 
 	r.offset += int64(len(line))
@@ -306,16 +308,25 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	trimmedLine := strings.TrimSpace(string(line)) // filenames that contain spaces may be terminated by a tab
 	parts := strings.SplitN(trimmedLine, "\t", 2)
 	filename = parts[0]
+	hadTZ = true
 	if len(parts) == 2 {
+		var ts time.Time
 		// Timestamp is optional, but this header has it.
-		ts, err := time.Parse(diffTimeParseLayout, parts[1])
+		ts, err = time.Parse(diffTimeParseLayout, parts[1])
 		if err != nil {
-			return "", nil, err
+			var err1 error
+			ts, err1 = time.Parse(diffTimeParseWithoutTZLayout, parts[1])
+			if err1 != nil {
+				return "", nil, hadTZ, err
+			}
+			hadTZ = false
+			ts = ts.In(time.Now().Location())
+			err = nil
 		}
 		timestamp = &ts
 	}
 
-	return filename, timestamp, err
+	return filename, timestamp, hadTZ, err
 }
 
 // OverflowError is returned when we have overflowed into the start

@@ -856,6 +856,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 	}{
 		{filename: "sample_multi_file.diff", wantFileDiffs: 2},
 		{filename: "sample_multi_file_single.diff", wantFileDiffs: 1},
+		{filename: "sample_multi_file_single_apple.diff", wantFileDiffs: 1},
 		{filename: "sample_multi_file_new.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_deleted.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_rename.diff", wantFileDiffs: 3},
