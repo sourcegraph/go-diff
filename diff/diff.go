@@ -15,19 +15,15 @@ type FileDiff struct {
 	// the original name of the file
 	OrigName string
 	// the original timestamp (nil if not present)
-	OrigTime      *time.Time
-	OrigTimeHasTZ bool
+	OrigTime *time.Time
 	// the new name of the file (often same as OrigName)
 	NewName string
 	// the new timestamp (nil if not present)
-	NewTime      *time.Time
-	NewTimeHasTZ bool
+	NewTime *time.Time
 	// extended header lines (e.g., git's "new mode <mode>", "rename from <path>", etc.)
 	Extended []string
 	// hunks that were changed from orig to new
 	Hunks []*Hunk
-
-	includeTZ bool
 }
 
 // A Hunk represents a series of changes (additions or deletions) in a file's
@@ -132,11 +128,6 @@ const diffTimeParseWithoutTZLayout = "2006-01-02 15:04:05"
 // header timestamps.
 // See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html.
 const diffTimeFormatLayout = "2006-01-02 15:04:05.000000000 -0700"
-
-// diffTimeFormatWithoutTZLayout is the layout used to format (i.e., print) the time in unified diff file
-// header timestamps without the timezone offset and the fractional seconds. This is used when the diff
-// does not include the timezone offset and fractional seconds.
-const diffTimeFormatWithoutTZLayout = "2006-01-02 15:04:05"
 
 func (s *Stat) add(o Stat) {
 	s.Added += o.Added

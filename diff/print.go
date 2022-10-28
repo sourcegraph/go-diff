@@ -49,10 +49,10 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 		return buf.Bytes(), nil
 	}
 
-	if err := printFileHeader(&buf, "--- ", d.OrigName, d.OrigTime, d.OrigTimeHasTZ); err != nil {
+	if err := printFileHeader(&buf, "--- ", d.OrigName, d.OrigTime); err != nil {
 		return nil, err
 	}
-	if err := printFileHeader(&buf, "+++ ", d.NewName, d.NewTime, d.NewTimeHasTZ); err != nil {
+	if err := printFileHeader(&buf, "+++ ", d.NewName, d.NewTime); err != nil {
 		return nil, err
 	}
 
@@ -67,16 +67,12 @@ func PrintFileDiff(d *FileDiff) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func printFileHeader(w io.Writer, prefix string, filename string, timestamp *time.Time, tz bool) error {
+func printFileHeader(w io.Writer, prefix string, filename string, timestamp *time.Time) error {
 	if _, err := fmt.Fprint(w, prefix, filename); err != nil {
 		return err
 	}
-	format := diffTimeFormatLayout
-	if !tz {
-		format = diffTimeFormatWithoutTZLayout
-	}
 	if timestamp != nil {
-		if _, err := fmt.Fprint(w, "\t", timestamp.Format(format)); err != nil {
+		if _, err := fmt.Fprint(w, "\t", timestamp.Format(diffTimeFormatLayout)); err != nil {
 			return err
 		}
 	}

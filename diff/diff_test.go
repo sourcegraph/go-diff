@@ -850,13 +850,14 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 
 func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 	tests := []struct {
-		filename      string
-		wantParseErr  error
-		wantFileDiffs int // How many instances of diff.FileDiff are expected.
+		filename        string
+		wantParseErr    error
+		wantFileDiffs   int    // How many instances of diff.FileDiff are expected.
+		wantOutFileName string // If non-empty, the name of the file containing the expected output.
 	}{
 		{filename: "sample_multi_file.diff", wantFileDiffs: 2},
 		{filename: "sample_multi_file_single.diff", wantFileDiffs: 1},
-		{filename: "sample_multi_file_single_apple.diff", wantFileDiffs: 1},
+		{filename: "sample_multi_file_single_apple_in.diff", wantFileDiffs: 1, wantOutFileName: "sample_multi_file_single_apple_out.diff"},
 		{filename: "sample_multi_file_new.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_deleted.diff", wantFileDiffs: 3},
 		{filename: "sample_multi_file_rename.diff", wantFileDiffs: 3},
@@ -892,6 +893,12 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		printed, err := PrintMultiFileDiff(diffs)
 		if err != nil {
 			t.Errorf("%s: PrintMultiFileDiff: %s", test.filename, err)
+		}
+		if test.wantOutFileName != "" {
+			diffData, err = ioutil.ReadFile(filepath.Join("testdata", test.wantOutFileName))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 		if !bytes.Equal(printed, diffData) {
 			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
