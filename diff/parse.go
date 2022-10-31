@@ -254,7 +254,6 @@ func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimest
 				"", nil, nil, nil
 		}
 	}
-
 	origName, origTimestamp, err = r.readOneFileHeader([]byte("--- "))
 	if err != nil {
 		return "", "", nil, nil, err
@@ -307,10 +306,16 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	parts := strings.SplitN(trimmedLine, "\t", 2)
 	filename = parts[0]
 	if len(parts) == 2 {
+		var ts time.Time
 		// Timestamp is optional, but this header has it.
-		ts, err := time.Parse(diffTimeParseLayout, parts[1])
+		ts, err = time.Parse(diffTimeParseLayout, parts[1])
 		if err != nil {
-			return "", nil, err
+			var err1 error
+			ts, err1 = time.Parse(diffTimeParseWithoutTZLayout, parts[1])
+			if err1 != nil {
+				return "", nil, err
+			}
+			err = nil
 		}
 		timestamp = &ts
 	}
