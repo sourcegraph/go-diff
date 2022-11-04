@@ -79,7 +79,7 @@ func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
 // false and ignore the error when readErr is io.EOF.
 func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (bool, error) {
 	if readErr != nil {
-		if readErr == io.EOF || readErr == bufio.ErrBufferFull {
+		if readErr == io.EOF || errors.Is(readErr, bufio.ErrBufferFull) {
 			return false, nil
 		}
 		return false, readErr

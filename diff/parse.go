@@ -66,7 +66,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	if err != nil {
 		switch e := err.(type) {
 		case *ParseError:
-			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
+			if errors.Is(e.Err, ErrNoFileHeader) || errors.Is(e.Err, ErrExtendedHeadersEOF) {
 				// Any non-diff content preceding a valid diff is included in the
 				// extended headers of the following diff. In this way, mixed diff /
 				// non-diff content can be parsed. Trailing non-diff content is
@@ -203,7 +203,7 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	fd := &FileDiff{}
 
 	fd.Extended, err = r.ReadExtendedHeaders()
-	if pe, ok := err.(*ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
+	if pe, ok := err.(*ParseError); ok && errors.Is(pe.Err, ErrExtendedHeadersEOF) {
 		wasEmpty := handleEmpty(fd)
 		if wasEmpty {
 			return fd, nil
