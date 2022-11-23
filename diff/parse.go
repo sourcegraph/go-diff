@@ -440,7 +440,7 @@ func parseDiffGitArgs(diffArgs string) (string, string, bool) {
 		// If the two strings could be equal, based on length, proceed.
 		if length%2 == 1 {
 			// If the name minus the a/ b/ prefixes is equal, proceed.
-			if len(first) >= 3 && length%2 == 1 && first[1] == '/' && first[1:] == second[1:] {
+			if len(first) >= 3 && first[1] == '/' && first[1:] == second[1:] {
 				return first, second, true
 			}
 			// If the names don't have the a/ and b/ prefixes and they're equal, proceed.
