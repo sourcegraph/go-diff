@@ -783,6 +783,56 @@ func TestParseMultiFileDiffHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			filename: "delete_empty_file.diff",
+			wantDiffs: []*FileDiff{
+				{
+					OrigName: "Euler 0011/README.txt~",
+					NewName:  "/dev/null",
+					Extended: []string{
+						"diff --git Euler 0011/README.txt~ Euler 0011/README.txt~",
+						"deleted file mode 100644",
+						"index e69de29bb2d1d6434b8b29ae775ad8c2e48c5391..0000000000000000000000000000000000000000",
+					},
+				},
+				{
+					OrigName: "Euler 0011/Euler0011.cpp",
+					NewName:  "/dev/null",
+					Extended: []string{
+						"diff --git Euler 0011/Euler0011.cpp Euler 0011/Euler0011.cpp",
+						"deleted file mode 100644",
+						"index 6490416c8cb4bbf2afbafa66251a9eab983086d1..0000000000000000000000000000000000000000",
+					},
+				},
+				{
+					OrigName: "Euler 0011/README.txt~",
+					NewName:  "/dev/null",
+					Extended: []string{
+						"diff --git Euler 0011/README.txt~ Euler 0011/README.txt~",
+						"deleted file mode 100644",
+						"index e69de29bb2d1d6434b8b29ae775ad8c2e48c5391..0000000000000000000000000000000000000000",
+					},
+				},
+				{
+					OrigName: "Euler 0011/README.txt",
+					NewName:  "/dev/null",
+					Extended: []string{
+						"diff --git Euler 0011/README.txt Euler 0011/README.txt",
+						"deleted file mode 100644",
+						"index f8ea904baa27c54eb73cc02d5a555878b28672ff..0000000000000000000000000000000000000000",
+					},
+				},
+				{
+					OrigName: "Euler 0011/README.txt~",
+					NewName:  "/dev/null",
+					Extended: []string{
+						"diff --git Euler 0011/README.txt~ Euler 0011/README.txt~",
+						"deleted file mode 100644",
+						"index e69de29bb2d1d6434b8b29ae775ad8c2e48c5391..0000000000000000000000000000000000000000",
+					},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.filename, func(t *testing.T) {
