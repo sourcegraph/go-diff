@@ -26,11 +26,21 @@ func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
 	return &MultiFileDiffReader{reader: newLineReader(r)}
 }
 
+// ContentHandler defines SAX-like contentHandler that is called during parsing
+// Use this to parse the diff in streaming fashion without loading the whole diff into memory
+type ContentHandler interface {
+	StartFile(fileDiff *FileDiff) error
+	StartHunk(hunk *Hunk) error
+	HunkLine(hunk *Hunk, line []byte) error
+}
+
 // MultiFileDiffReader reads a multi-file unified diff.
 type MultiFileDiffReader struct {
 	line   int
 	offset int64
 	reader *lineReader
+
+	contentHandler ContentHandler
 
 	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
 
@@ -40,6 +50,22 @@ type MultiFileDiffReader struct {
 	// store nextFileFirstLine so we can "give the first line back" to
 	// the next file.
 	nextFileFirstLine []byte
+}
+
+// ReadDiffWithContentHandler reads the diff in SAX manner
+func ReadDiffWithContentHandler(r io.Reader, contentHandler ContentHandler) error {
+	dr := NewMultiFileDiffReader(r)
+	dr.contentHandler = contentHandler
+
+	for {
+		_, err := dr.ReadFile()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // ReadFile reads the next file unified diff (including headers and
@@ -59,6 +85,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 		offset:         r.offset,
 		reader:         r.reader,
 		fileHeaderLine: r.nextFileFirstLine,
+		contentHandler: r.contentHandler,
 	}
 	r.nextFileFirstLine = nil
 
@@ -83,9 +110,24 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 
 		case OverflowError:
 			r.nextFileFirstLine = []byte(e)
+
+			// As fd considered to bew valid, need to call ContentHandler
+			if r.contentHandler != nil {
+				if err := r.contentHandler.StartFile(fd); err != nil {
+					return nil, "", err
+				}
+			}
+
 			return fd, "", nil
 
 		default:
+			return nil, "", err
+		}
+	}
+
+	// StartFile is called after the file headers are read but not hunks
+	if r.contentHandler != nil {
+		if err := r.contentHandler.StartFile(fd); err != nil {
 			return nil, "", err
 		}
 	}
@@ -164,9 +206,10 @@ func NewFileDiffReader(r io.Reader) *FileDiffReader {
 
 // FileDiffReader reads a unified file diff.
 type FileDiffReader struct {
-	line   int
-	offset int64
-	reader *lineReader
+	line           int
+	offset         int64
+	reader         *lineReader
+	contentHandler ContentHandler
 
 	// fileHeaderLine is the first file header line, set by:
 	//
@@ -237,9 +280,10 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 // correct position information).
 func (r *FileDiffReader) HunksReader() *HunksReader {
 	return &HunksReader{
-		line:   r.line,
-		offset: r.offset,
-		reader: r.reader,
+		line:           r.line,
+		offset:         r.offset,
+		reader:         r.reader,
+		contentHandler: r.contentHandler,
 	}
 }
 
@@ -602,10 +646,11 @@ func NewHunksReader(r io.Reader) *HunksReader {
 
 // A HunksReader reads hunks from a unified diff.
 type HunksReader struct {
-	line   int
-	offset int64
-	hunk   *Hunk
-	reader *lineReader
+	line           int
+	offset         int64
+	hunk           *Hunk
+	reader         *lineReader
+	contentHandler ContentHandler
 
 	nextHunkHeaderLine []byte
 }
@@ -662,6 +707,12 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 			}
 
 			r.hunk.Section = section
+
+			if r.contentHandler != nil {
+				if err := r.contentHandler.StartHunk(r.hunk); err != nil {
+					return nil, err
+				}
+			}
 		} else {
 			// Read hunk body line.
 
@@ -722,8 +773,14 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				lastLineFromOrig = line[0] == '-'
 			}
 
-			r.hunk.Body = append(r.hunk.Body, line...)
-			r.hunk.Body = append(r.hunk.Body, '\n')
+			if r.contentHandler != nil {
+				if err := r.contentHandler.HunkLine(r.hunk, line); err != nil {
+					return nil, err
+				}
+			} else {
+				r.hunk.Body = append(r.hunk.Body, line...)
+				r.hunk.Body = append(r.hunk.Body, '\n')
+			}
 		}
 	}
 }
@@ -794,10 +851,12 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 			return hunks, nil
 		}
 		if hunk != nil {
-			linesRead++ // account for the hunk header line
-			hunk.StartPosition = linesRead
-			hunks = append(hunks, hunk)
-			linesRead += int32(bytes.Count(hunk.Body, []byte{'\n'}))
+			if r.contentHandler == nil {
+				linesRead++ // account for the hunk header line
+				hunk.StartPosition = linesRead
+				hunks = append(hunks, hunk)
+				linesRead += int32(bytes.Count(hunk.Body, []byte{'\n'}))
+			}
 		}
 		if err != nil {
 			return hunks, err
