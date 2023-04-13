@@ -116,6 +116,14 @@ type virtualDiff struct {
 	currentLineOffset int
 }
 
+func (vd *virtualDiff) reset() {
+	vd.currentFileHeader = 0
+	vd.currentFileHeaderOffset = 0
+
+	vd.currentLine = 0
+	vd.currentLineOffset = 0
+}
+
 func (vd *virtualDiff) Read(p []byte) (n int, err error) {
 
 	for {
@@ -164,7 +172,7 @@ func (h *emptyContentHandler) StartFile(fileDiff *FileDiff) error {
 func (h *emptyContentHandler) StartHunk(hunk *Hunk) error {
 	return nil
 }
-func (h *emptyContentHandler) HunkLine(hunk *Hunk, line []byte) error {
+func (h *emptyContentHandler) HunkLine(hunk *Hunk, line []byte, eol bool) error {
 	return nil
 }
 
@@ -190,7 +198,40 @@ index aa4de15..7c048ab 100644
 	err := ReadDiffWithContentHandler(virtualDiff, &emptyContentHandler{})
 	a.NoError(err)
 
-	// in contrast, try running without content handler
+	// in contrast, try running without content handler and see GBs of memory used :)
 	// err := ReadDiffWithContentHandler(virtualDiff, nil)
 	// a.NoError(err)
+}
+
+func TestReadDiffWithContentHandler_LongHunkLines(t *testing.T) {
+	a := assert.New(t)
+
+	virtualDiff := &virtualDiff{}
+	virtualDiff.diffFileHeader = `diff --git a/README.md b/README.md
+index aa4de15..7c048ab 100644
+--- oldname	2009-10-11 15:12:20.000000000 +0000
++++ newname	2009-10-11 15:12:30.000000000 +0000
+@@ -1,1 +1,1 @@
+`
+
+	virtualDiff.line = `+` + strings.Repeat("a", 1000000) + "\n" // 1MB
+	virtualDiff.lineRepeats = 1
+	// total diff size is 1TB
+	virtualDiff.diffFileRepeats = 1
+
+	// first, run without contentHandler
+	fileDiffs, err := NewMultiFileDiffReader(virtualDiff).ReadAllFiles()
+	a.NoError(err)
+	a.Equal(1, len(fileDiffs))
+	a.Equal(1, len(fileDiffs[0].Hunks))
+	a.Equal([]byte(virtualDiff.line), fileDiffs[0].Hunks[0].Body)
+
+	// second, read with contentHandler
+	virtualDiff.reset()
+	h := &domContentHandler{}
+	err = ReadDiffWithContentHandler(virtualDiff, h)
+	a.NoError(err)
+	a.Equal(1, len(h.fileDiffs))
+	a.Equal(1, len(h.fileDiffs[0].Hunks))
+	a.Equal([]byte(virtualDiff.line), h.fileDiffs[0].Hunks[0].Body)
 }

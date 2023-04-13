@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/sourcegraph/go-diff/diff"
+	"github.com/blubracket/go-diff/diff"
 )
 
 // A diagnostic program to aid in debugging diff parsing or printing

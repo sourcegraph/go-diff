@@ -1,4 +1,4 @@
-module github.com/sourcegraph/go-diff
+module github.com/blubracket/go-diff
 
 go 1.14
 

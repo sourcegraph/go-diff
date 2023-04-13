@@ -18,26 +18,29 @@ func newLineReader(r io.Reader) *lineReader {
 type lineReader struct {
 	reader *bufio.Reader
 
-	cachedNextLine    []byte
-	cachedNextLineErr error
+	// cachedNextLine    []byte
+	// cachedNextLineErr error
 }
 
 // readLine returns the next unconsumed line and advances the internal cache of
 // the lineReader.
 func (l *lineReader) readLine() ([]byte, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
 
-	if l.cachedNextLineErr != nil {
-		return nil, l.cachedNextLineErr
-	}
+	return readLine(l.reader)
 
-	next := l.cachedNextLine
-
-	l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-
-	return next, nil
+	// if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+	// 	l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+	// }
+	//
+	// if l.cachedNextLineErr != nil {
+	// 	return nil, l.cachedNextLineErr
+	// }
+	//
+	// next := l.cachedNextLine
+	//
+	// l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+	//
+	// return next, nil
 }
 
 // nextLineStartsWith looks at the line that would be returned by the next call
@@ -46,11 +49,14 @@ func (l *lineReader) readLine() ([]byte, error) {
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
 func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
+	// if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+	// 	l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+	// }
+	//
+	// return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
 
-	return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
+	peeked, _ := l.reader.Peek(len(prefix))
+	return bytes.HasPrefix(peeked, []byte(prefix)), nil
 }
 
 // nextNextLineStartsWith checks the prefix of the line *after* the line that
@@ -62,14 +68,14 @@ func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
 // The lineReader MUST be initialized by calling readLine at least once before
 // calling nextLineStartsWith. Otherwise ErrLineReaderUninitialized will be
 // returned.
-func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
-
-	next, err := l.reader.Peek(len(prefix))
-	return l.lineHasPrefix(next, prefix, err)
-}
+// func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
+// 	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+// 		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+// 	}
+//
+// 	next, err := l.reader.Peek(len(prefix))
+// 	return l.lineHasPrefix(next, prefix, err)
+// }
 
 // lineHasPrefix checks whether the given line has the given prefix with
 // bytes.HasPrefix.
