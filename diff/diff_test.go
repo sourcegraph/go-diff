@@ -63,7 +63,6 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		filename     string
 		wantParseErr error
 	}{
-		// {filename: "sample_hunk.diff"},
 		{filename: "sample_hunks.diff"},
 		{filename: "sample_bad_hunks.diff"},
 		{filename: "sample_hunks_no_newline.diff"},

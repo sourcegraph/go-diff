@@ -146,21 +146,13 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	// need to perform the check here.
 	hr := fr.HunksReader()
 
-	// line, err := r.reader.readLine()
-	// if err != nil && err != io.EOF {
-	// 	return fd, "", err
-	// }
-	// line = bytes.TrimSuffix(line, []byte{'\n'})
-
 	// there is no need to read the next line, we already have it
 	hasHunkPrefix, err := r.reader.nextLineStartsWith(string(hunkPrefix))
 	if err != nil {
 		return fd, "", err
 	}
 
-	// if bytes.HasPrefix(line, hunkPrefix) {
 	if hasHunkPrefix {
-		// hr.nextHunkHeaderLine = line
 		fd.Hunks, err = hr.ReadAllHunks()
 		r.line = fr.line
 		r.offset = fr.offset
@@ -175,10 +167,6 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 			}
 			return nil, "", err
 		}
-	} else {
-		// There weren't any hunks, so that line we peeked ahead at
-		// actually belongs to the next file. Put it back.
-		// r.nextFileFirstLine = line
 	}
 
 	return fd, "", nil
