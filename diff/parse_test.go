@@ -169,7 +169,13 @@ func (h *emptyContentHandler) StartFile(fileDiff *FileDiff) error {
 	h.fileNo++
 	return nil
 }
+func (h *emptyContentHandler) EndFile(fileDiff *FileDiff) error {
+	return nil
+}
 func (h *emptyContentHandler) StartHunk(hunk *Hunk) error {
+	return nil
+}
+func (h *emptyContentHandler) EndHunk(hunk *Hunk) error {
 	return nil
 }
 func (h *emptyContentHandler) HunkLine(hunk *Hunk, line []byte, eol bool) error {

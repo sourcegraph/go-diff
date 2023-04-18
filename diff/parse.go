@@ -30,7 +30,9 @@ func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
 // Use this to parse a diff in streaming mode with minimum memory footprint
 type ContentHandler interface {
 	StartFile(fileDiff *FileDiff) error
+	EndFile(fileDiff *FileDiff) error
 	StartHunk(hunk *Hunk) error
+	EndHunk(hunk *Hunk) error
 	HunkLine(hunk *Hunk, line []byte, eol bool) error
 }
 
@@ -79,7 +81,21 @@ func (r *MultiFileDiffReader) ReadFile() (*FileDiff, error) {
 // ReadFileWithTrailingContent reads the next file unified diff (including
 // headers and all hunks) from r, also returning any trailing content. If there
 // are no more files in the diff, it returns error io.EOF.
-func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, error) {
+func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (retFD *FileDiff, retTrailingContent string, retErr error) {
+
+	// call contentHandler.EndFile as the last operation
+	defer func() {
+		if r.contentHandler != nil && retFD != nil {
+
+			err := r.contentHandler.EndFile(retFD)
+			if err != nil {
+				retFD = nil
+				retErr = err
+				retTrailingContent = ""
+			}
+		}
+	}()
+
 	fr := &FileDiffReader{
 		line:           r.line,
 		offset:         r.offset,
@@ -650,12 +666,24 @@ type HunksReader struct {
 	contentHandler ContentHandler
 }
 
-func (r *HunksReader) ReadHunk() (*Hunk, error) {
+func (r *HunksReader) ReadHunk() (retHunk *Hunk, retErr error) {
 
 	// expectation is that the r.reader is already at the start of a hunk
 	// this implementation expects hunk body lines to be arbitrary long,
 	// thus it will not use `r.reader.readLine` that always reads the full line,
 	// it will use `r.reader.reader.ReadLine` that reads up to r.reader.reader buf size
+
+	// call contentHandler.EndHunk as the last operation
+	defer func() {
+		if r.contentHandler != nil && retHunk != nil {
+
+			err := r.contentHandler.EndHunk(retHunk)
+			if err != nil {
+				retHunk = nil
+				retErr = err
+			}
+		}
+	}()
 
 	lastLineFromOrig := true
 

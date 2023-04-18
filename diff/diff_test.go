@@ -1141,8 +1141,16 @@ func (h *domContentHandler) StartFile(fileDiff *FileDiff) error {
 	return nil
 }
 
+func (h *domContentHandler) EndFile(fileDiff *FileDiff) error {
+	return nil
+}
+
 func (h *domContentHandler) StartHunk(hunk *Hunk) error {
 	h.currentFileDiff.Hunks = append(h.currentFileDiff.Hunks, hunk)
+	return nil
+}
+
+func (h *domContentHandler) EndHunk(hunk *Hunk) error {
 	return nil
 }
 
