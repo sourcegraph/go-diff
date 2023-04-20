@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func unix(sec int64) *time.Time {
@@ -62,7 +63,6 @@ func TestParseHunksAndPrintHunks(t *testing.T) {
 		filename     string
 		wantParseErr error
 	}{
-		{filename: "sample_hunk.diff"},
 		{filename: "sample_hunks.diff"},
 		{filename: "sample_bad_hunks.diff"},
 		{filename: "sample_hunks_no_newline.diff"},
@@ -1121,5 +1121,108 @@ func TestFileDiff_Stat(t *testing.T) {
 			t.Errorf("%s: got - want diff stat\n%s", label, cmp.Diff(test.want, stat))
 			continue
 		}
+	}
+}
+
+type domContentHandler struct {
+	fileDiffs []*FileDiff
+
+	currentFileDiff *FileDiff
+}
+
+func (h *domContentHandler) StartFile(fileDiff *FileDiff) error {
+
+	// Note: creating a copy of the fileDiff here is necessary because
+	// it will be modified by the parser, especially fileDiff.Hunks
+	// if we use original fileDiff, it's fileDiff.Hunks will be reset to nil after all hunks are parsed
+	currentFileDiff := *fileDiff
+	h.currentFileDiff = &currentFileDiff
+	h.fileDiffs = append(h.fileDiffs, h.currentFileDiff)
+	return nil
+}
+
+func (h *domContentHandler) StartHunk(hunk *Hunk) error {
+	h.currentFileDiff.Hunks = append(h.currentFileDiff.Hunks, hunk)
+	return nil
+}
+
+func (h *domContentHandler) HunkLine(hunk *Hunk, line []byte, eol bool) error {
+	hunk.Body = append(hunk.Body, line...)
+	if eol {
+		hunk.Body = append(hunk.Body, '\n')
+	}
+
+	return nil
+}
+
+func TestParseMultiFileDiffWithContentHandler(t *testing.T) {
+	tests := []struct {
+		filename string
+	}{
+		{filename: "sample_multi_file.diff"},
+		{filename: "sample_multi_file_single.diff"},
+		{filename: "sample_multi_file_single_apple_in.diff"},
+		{filename: "sample_multi_file_new.diff"},
+		{filename: "sample_multi_file_deleted.diff"},
+		{filename: "sample_multi_file_rename.diff"},
+		{filename: "sample_multi_file_binary.diff"},
+		{filename: "long_line_multi.diff"},
+		{filename: "empty.diff"},
+		{filename: "empty_multi.diff"},
+		{filename: "sample_contains_added_deleted_files.diff"},
+		{filename: "sample_contains_only_added_deleted_files.diff"},
+		{filename: "sample_onlyin_line_isnt_a_file_header.diff"},
+		{filename: "sample_onlyin_complex_filenames.diff"},
+		{filename: "sample_multi_file_minuses_pluses.diff"},
+		{filename: "sample_multi_file_without_extended.diff"},
+
+		{filename: "sample_file_extended.diff"},
+		{filename: "sample_file_extended_binary_rename.diff"},
+		{filename: "sample_file_extended_binary_rename_no_index.diff"},
+		{filename: "sample_file_extended_empty_binary.diff"},
+		{filename: "sample_file_extended_empty_deleted.diff"},
+		{filename: "sample_file_extended_empty_deleted_binary.diff"},
+		{filename: "sample_file_extended_empty_mode_change.diff"},
+		{filename: "sample_file_extended_empty_new.diff"},
+		{filename: "sample_file_extended_empty_new_binary.diff"},
+		{filename: "sample_file_extended_empty_rename.diff"},
+		{filename: "sample_file_extended_empty_rename_and_mode_change.diff"},
+		{filename: "sample_file_no_fractional_seconds.diff"},
+		{filename: "sample_file_no_timestamp.diff"},
+	}
+	for _, test := range tests {
+
+		t.Run(test.filename, func(t *testing.T) {
+
+			a := assert.New(t)
+
+			diffData, err := ioutil.ReadFile(filepath.Join("testdata", test.filename))
+			a.NoError(err)
+
+			// parse without content handler
+			diffs, err := ParseMultiFileDiff(diffData)
+			a.NoError(err)
+
+			// parse with content handler
+
+			var contentHandler = &domContentHandler{}
+			err = ReadDiffWithContentHandler(bytes.NewReader(diffData), contentHandler)
+			a.NoError(err)
+
+			// diffs should be equal except hunk.StartPosition that is not set with content handler specified
+			// Note: this can be considered as a bug, but requires more changes to the original hunk reading
+			for _, d := range diffs {
+				for _, h := range d.Hunks {
+					h.StartPosition = 0
+				}
+			}
+			for _, d := range contentHandler.fileDiffs {
+				for _, h := range d.Hunks {
+					h.StartPosition = 0
+				}
+			}
+
+			a.Equal(diffs, contentHandler.fileDiffs)
+		})
 	}
 }

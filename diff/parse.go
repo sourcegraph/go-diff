@@ -26,11 +26,21 @@ func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
 	return &MultiFileDiffReader{reader: newLineReader(r)}
 }
 
+// ContentHandler defines SAX-like contentHandler for diff parsing
+// Use this to parse a diff in streaming mode with minimum memory footprint
+type ContentHandler interface {
+	StartFile(fileDiff *FileDiff) error
+	StartHunk(hunk *Hunk) error
+	HunkLine(hunk *Hunk, line []byte, eol bool) error
+}
+
 // MultiFileDiffReader reads a multi-file unified diff.
 type MultiFileDiffReader struct {
 	line   int
 	offset int64
 	reader *lineReader
+
+	contentHandler ContentHandler
 
 	// TODO(sqs): line and offset tracking in multi-file diffs is broken; add tests and fix
 
@@ -40,6 +50,22 @@ type MultiFileDiffReader struct {
 	// store nextFileFirstLine so we can "give the first line back" to
 	// the next file.
 	nextFileFirstLine []byte
+}
+
+// ReadDiffWithContentHandler reads the diff in SAX manner
+func ReadDiffWithContentHandler(r io.Reader, contentHandler ContentHandler) error {
+	dr := NewMultiFileDiffReader(r)
+	dr.contentHandler = contentHandler
+
+	for {
+		_, err := dr.ReadFile()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // ReadFile reads the next file unified diff (including headers and
@@ -59,6 +85,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 		offset:         r.offset,
 		reader:         r.reader,
 		fileHeaderLine: r.nextFileFirstLine,
+		contentHandler: r.contentHandler,
 	}
 	r.nextFileFirstLine = nil
 
@@ -83,9 +110,24 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 
 		case OverflowError:
 			r.nextFileFirstLine = []byte(e)
+
+			// As fd considered to bew valid, need to call ContentHandler
+			if r.contentHandler != nil {
+				if err := r.contentHandler.StartFile(fd); err != nil {
+					return nil, "", err
+				}
+			}
+
 			return fd, "", nil
 
 		default:
+			return nil, "", err
+		}
+	}
+
+	// StartFile is called after the file headers are read but not hunks
+	if r.contentHandler != nil {
+		if err := r.contentHandler.StartFile(fd); err != nil {
 			return nil, "", err
 		}
 	}
@@ -103,13 +145,14 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	// caused by the lack of any hunks, or a malformatted hunk, so we
 	// need to perform the check here.
 	hr := fr.HunksReader()
-	line, err := r.reader.readLine()
-	if err != nil && err != io.EOF {
+
+	// there is no need to read the next line, we already have it
+	hasHunkPrefix, err := r.reader.nextLineStartsWith(string(hunkPrefix))
+	if err != nil {
 		return fd, "", err
 	}
-	line = bytes.TrimSuffix(line, []byte{'\n'})
-	if bytes.HasPrefix(line, hunkPrefix) {
-		hr.nextHunkHeaderLine = line
+
+	if hasHunkPrefix {
 		fd.Hunks, err = hr.ReadAllHunks()
 		r.line = fr.line
 		r.offset = fr.offset
@@ -124,10 +167,6 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 			}
 			return nil, "", err
 		}
-	} else {
-		// There weren't any hunks, so that line we peeked ahead at
-		// actually belongs to the next file. Put it back.
-		r.nextFileFirstLine = line
 	}
 
 	return fd, "", nil
@@ -164,9 +203,10 @@ func NewFileDiffReader(r io.Reader) *FileDiffReader {
 
 // FileDiffReader reads a unified file diff.
 type FileDiffReader struct {
-	line   int
-	offset int64
-	reader *lineReader
+	line           int
+	offset         int64
+	reader         *lineReader
+	contentHandler ContentHandler
 
 	// fileHeaderLine is the first file header line, set by:
 	//
@@ -237,9 +277,10 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 // correct position information).
 func (r *FileDiffReader) HunksReader() *HunksReader {
 	return &HunksReader{
-		line:   r.line,
-		offset: r.offset,
-		reader: r.reader,
+		line:           r.line,
+		offset:         r.offset,
+		reader:         r.reader,
+		contentHandler: r.contentHandler,
 	}
 }
 
@@ -604,126 +645,166 @@ func NewHunksReader(r io.Reader) *HunksReader {
 type HunksReader struct {
 	line   int
 	offset int64
-	hunk   *Hunk
-	reader *lineReader
-
-	nextHunkHeaderLine []byte
+	// hunk           *Hunk
+	reader         *lineReader
+	contentHandler ContentHandler
 }
 
-// ReadHunk reads one hunk from r. If there are no more hunks, it
-// returns error io.EOF.
 func (r *HunksReader) ReadHunk() (*Hunk, error) {
-	r.hunk = nil
+
+	// expectation is that the r.reader is already at the start of a hunk
+	// this implementation expects hunk body lines to be arbitrary long,
+	// thus it will not use `r.reader.readLine` that always reads the full line,
+	// it will use `r.reader.reader.ReadLine` that reads up to r.reader.reader buf size
+
 	lastLineFromOrig := true
-	var line []byte
-	var err error
-	for {
-		if r.nextHunkHeaderLine != nil {
-			// Use stored hunk header line that was scanned in at the
-			// completion of the previous hunk's ReadHunk.
-			line = r.nextHunkHeaderLine
-			r.nextHunkHeaderLine = nil
-		} else {
-			line, err = r.reader.readLine()
-			if err != nil {
-				if err == io.EOF && r.hunk != nil {
-					return r.hunk, nil
-				}
-				return nil, err
-			}
+
+	line, isPrefix, err := r.reader.reader.ReadLine()
+	eol := !isPrefix
+	if err == io.EOF {
+		return nil, err
+	}
+	if !bytes.HasPrefix(line, hunkPrefix) {
+		return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
+	}
+
+	// !eol is true if the line is longer than the buffer size
+	// this means it can't be a hunk header
+	if !eol {
+		return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
+	}
+
+	// Parse hunk header.
+	hunk := &Hunk{}
+	items := []interface{}{
+		&hunk.OrigStartLine, &hunk.OrigLines,
+		&hunk.NewStartLine, &hunk.NewLines,
+	}
+	header, section, err := normalizeHeader(string(line))
+	if err != nil {
+		return nil, &ParseError{r.line, r.offset, err}
+	}
+	n, err := fmt.Sscanf(header, hunkHeader, items...)
+	if err != nil {
+		return nil, err
+	}
+	if n < len(items) {
+		return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
+	}
+
+	hunk.Section = section
+
+	if r.contentHandler != nil {
+		if err := r.contentHandler.StartHunk(hunk); err != nil {
+			return nil, err
 		}
+	}
 
-		// Record position.
-		r.line++
-		r.offset += int64(len(line))
+	r.line++
+	r.offset += int64(len(line))
 
-		if r.hunk == nil {
-			// Check for presence of hunk header.
-			if !bytes.HasPrefix(line, hunkPrefix) {
-				return nil, &ParseError{r.line, r.offset, ErrNoHunkHeader}
-			}
+	// Read hunk body
+	for {
 
-			// Parse hunk header.
-			r.hunk = &Hunk{}
-			items := []interface{}{
-				&r.hunk.OrigStartLine, &r.hunk.OrigLines,
-				&r.hunk.NewStartLine, &r.hunk.NewLines,
-			}
-			header, section, err := normalizeHeader(string(line))
-			if err != nil {
-				return nil, &ParseError{r.line, r.offset, err}
-			}
-			n, err := fmt.Sscanf(header, hunkHeader, items...)
-			if err != nil {
-				return nil, err
-			}
-			if n < len(items) {
-				return nil, &ParseError{r.line, r.offset, &ErrBadHunkHeader{header: string(line)}}
-			}
+		// before actually read the next line, we peek the stream to see if the next line is still part of the hunk
+		// do it only if we did reach the end of line for the previous line
+		if eol {
+			// we might need to peek across the lines, so peek as much as we can
+			lenToPeek := r.reader.reader.Size()
+			peeked, _ := r.reader.reader.Peek(lenToPeek)
 
-			r.hunk.Section = section
-		} else {
-			// Read hunk body line.
+			// if the next line seems to be a hunk header, we stop reading the current hunk
+			if bytes.HasPrefix(peeked, hunkPrefix) {
+				return hunk, nil
+			}
 
 			// If the line starts with `---` and the next one with `+++` we're
 			// looking at a non-extended file header and need to abort.
-			if bytes.HasPrefix(line, []byte("---")) {
-				ok, err := r.reader.nextLineStartsWith("+++")
-				if err != nil {
-					return r.hunk, err
-				}
-				if ok {
-					ok2, _ := r.reader.nextNextLineStartsWith(string(hunkPrefix))
-					if ok2 {
-						return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+			// we check for following three lines:
+			// --- a/file
+			// +++ b/file
+			// @@ -1,3 +1,3 @@
+			// The first one we already did read
+			// For second and third we will Peek the stream trying to find it
+			// as second and third lines are expected to be short, it should be possible with Peek
+			if bytes.HasPrefix(peeked, []byte("---")) {
+				// find the "second" line
+				const LN = 0xa
+				i := bytes.IndexByte(peeked, LN)
+				if i > 0 {
+					if bytes.HasPrefix(peeked[i+1:], []byte("+++")) {
+						// find the "third" line
+						j := bytes.IndexByte(peeked[i+1:], LN)
+						if j > 0 {
+							if bytes.HasPrefix(peeked[i+j+2:], hunkPrefix) {
+								return hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{}}
+							}
+						}
 					}
 				}
 			}
 
-			// If the line starts with the hunk prefix, this hunk is complete.
-			if bytes.HasPrefix(line, hunkPrefix) {
-				// But we've already read in the next hunk's
-				// header, so we need to be sure that the next call to
-				// ReadHunk starts with that header.
-				r.nextHunkHeaderLine = line
-
-				// Rewind position.
-				r.line--
-				r.offset -= int64(len(line))
-
-				return r.hunk, nil
-			}
-
-			if len(line) >= 1 && !linePrefix(line[0]) {
+			if len(peeked) >= 1 && !linePrefix(peeked[0]) {
 				// Bad hunk header line. If we're reading a multi-file
 				// diff, this may be the end of the current
 				// file. Return a "rich" error that lets our caller
 				// handle that case.
-				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
+				// Note: do NOT pass any line in ErrBadHunkLine as we did not read it from the reader stream yet
+				return hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{}}
 			}
-			if bytes.Equal(line, []byte(noNewlineMessage)) {
-				if lastLineFromOrig {
-					// Retain the newline in the body (otherwise the
-					// diff line would be like "-a+b", where "+b" is
-					// the the next line of the new file, which is not
-					// validly formatted) but record that the orig had
-					// no newline.
-					r.hunk.OrigNoNewlineAt = int32(len(r.hunk.Body))
-				} else {
-					// Remove previous line's newline.
-					if len(r.hunk.Body) != 0 {
-						r.hunk.Body = r.hunk.Body[:len(r.hunk.Body)-1]
-					}
+
+		}
+
+		// if we here it means the next line (part) is still part of the hunk
+		// read it
+		prevEol := eol
+
+		line, isPrefix, err := r.reader.reader.ReadLine()
+		eol = !isPrefix
+
+		r.offset += int64(len(line))
+		// Record position.
+		if eol {
+			line = dropCR(line)
+			r.line++
+		}
+
+		if err == io.EOF {
+			return hunk, nil
+		}
+
+		if prevEol && bytes.Equal(line, []byte(noNewlineMessage)) {
+			if lastLineFromOrig {
+				// Retain the newline in the body (otherwise the
+				// diff line would be like "-a+b", where "+b" is
+				// the next line of the new file, which is not
+				// validly formatted) but record that the orig had
+				// no newline.
+				hunk.OrigNoNewlineAt = int32(len(hunk.Body))
+			} else {
+				// Remove previous line's newline.
+				if len(hunk.Body) != 0 {
+					hunk.Body = hunk.Body[:len(hunk.Body)-1]
 				}
-				continue
 			}
+			continue
+		}
 
-			if len(line) > 0 {
-				lastLineFromOrig = line[0] == '-'
+		if prevEol && len(line) > 0 {
+			lastLineFromOrig = line[0] == '-'
+		}
+
+		if r.contentHandler != nil {
+			if err := r.contentHandler.HunkLine(hunk, line, eol); err != nil {
+				return nil, err
 			}
+		} else {
+			hunk.Body = append(hunk.Body, line...)
 
-			r.hunk.Body = append(r.hunk.Body, line...)
-			r.hunk.Body = append(r.hunk.Body, '\n')
+			// if last part of the line, add a newline
+			if eol {
+				hunk.Body = append(hunk.Body, '\n')
+			}
 		}
 	}
 }
@@ -734,7 +815,7 @@ const noNewlineMessage = `\ No newline at end of file`
 // hunk can start with. '\' can appear in diffs when no newline is
 // present at the end of a file.
 // See: 'http://www.gnu.org/software/diffutils/manual/diffutils.html#Incomplete-Lines'
-var linePrefixes = []byte{' ', '-', '+', '\\'}
+var linePrefixes = []byte{' ', '-', '+', '\\', '\n'}
 
 // linePrefix returns true if 'c' is in 'linePrefixes'.
 func linePrefix(c byte) bool {
@@ -794,10 +875,12 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 			return hunks, nil
 		}
 		if hunk != nil {
-			linesRead++ // account for the hunk header line
-			hunk.StartPosition = linesRead
-			hunks = append(hunks, hunk)
-			linesRead += int32(bytes.Count(hunk.Body, []byte{'\n'}))
+			if r.contentHandler == nil {
+				linesRead++ // account for the hunk header line
+				hunk.StartPosition = linesRead
+				hunks = append(hunks, hunk)
+				linesRead += int32(bytes.Count(hunk.Body, []byte{'\n'}))
+			}
 		}
 		if err != nil {
 			return hunks, err
