@@ -94,9 +94,7 @@ index 0000000..3be2928
 	if err != nil {
 		t.Fatal(err)
 	}
-	// if in.cachedNextLineErr != io.EOF {
-	// 	t.Fatalf("lineReader has wrong cachedNextLineErr: %s", in.cachedNextLineErr)
-	// }
+
 	_, err = in.readLine()
 	if err != io.EOF {
 		t.Fatalf("readLine did not return io.EOF: %s", err)
@@ -188,17 +186,6 @@ ccc rest of line`
 				t.Fatalf("unexpected result for prefix %q. got=%t, want=%t", assert.prefix, got, assert.want)
 			}
 		}
-
-		// for _, assert := range tc.nextNextLine {
-		// 	got, err := in.nextNextLineStartsWith(assert.prefix)
-		// 	if err != nil {
-		// 		t.Fatalf("nextLineStartsWith returned unexpected error: %s", err)
-		// 	}
-		//
-		// 	if got != assert.want {
-		// 		t.Fatalf("unexpected result for prefix %q. got=%t, want=%t", assert.prefix, got, assert.want)
-		// 	}
-		// }
 
 		_, err := in.readLine()
 		if err != tc.wantReadLineErr {
