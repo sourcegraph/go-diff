@@ -127,7 +127,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (retFD *FileDiff, re
 		case OverflowError:
 			r.nextFileFirstLine = []byte(e)
 
-			// As fd considered to bew valid, need to call ContentHandler
+			// As fd considered to be valid, need to call ContentHandler
 			if r.contentHandler != nil {
 				if err := r.contentHandler.StartFile(fd); err != nil {
 					return nil, "", err
