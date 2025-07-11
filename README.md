@@ -1,4 +1,4 @@
-# go-diff [![Build Status](https://travis-ci.org/sourcegraph/go-diff.svg?branch=master)](https://travis-ci.org/sourcegraph/go-diff) [![GoDoc](https://godoc.org/github.com/sourcegraph/go-diff/diff?status.svg)](https://godoc.org/github.com/sourcegraph/go-diff/diff)
+# go-diff [![GoDoc](https://godoc.org/github.com/sourcegraph/go-diff/diff?status.svg)](https://godoc.org/github.com/sourcegraph/go-diff/diff)
 
 Diff parser and printer for Go.
 
