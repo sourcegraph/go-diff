@@ -1,43 +1,52 @@
 package diff
 
 import (
-	"bufio"
-	"bytes"
-	"errors"
-	"io"
+"bufio"
+"bytes"
+"errors"
+"io"
 )
 
 var ErrLineReaderUninitialized = errors.New("line reader not initialized")
 
 func newLineReader(r io.Reader) *lineReader {
-	return &lineReader{reader: bufio.NewReader(r)}
+return &lineReader{reader: bufio.NewReader(r)}
+}
+
+func newLineReaderOptions(r io.Reader, opts ParseOptions) *lineReader {
+return &lineReader{
+reader: bufio.NewReader(r),
+keepCR: opts.KeepCR,
+}
 }
 
 // lineReader is a wrapper around a bufio.Reader that caches the next line to
 // provide lookahead functionality for the next two lines.
 type lineReader struct {
-	reader *bufio.Reader
+reader *bufio.Reader
 
-	cachedNextLine    []byte
-	cachedNextLineErr error
+cachedNextLine    []byte
+cachedNextLineErr error
+
+keepCR bool
 }
 
 // readLine returns the next unconsumed line and advances the internal cache of
 // the lineReader.
 func (l *lineReader) readLine() ([]byte, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
+if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
+}
 
-	if l.cachedNextLineErr != nil {
-		return nil, l.cachedNextLineErr
-	}
+if l.cachedNextLineErr != nil {
+return nil, l.cachedNextLineErr
+}
 
-	next := l.cachedNextLine
+next := l.cachedNextLine
 
-	l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
+l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
 
-	return next, nil
+return next, nil
 }
 
 // nextLineStartsWith looks at the line that would be returned by the next call
@@ -46,11 +55,11 @@ func (l *lineReader) readLine() ([]byte, error) {
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
 func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
+if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
+}
 
-	return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
+return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
 }
 
 // nextNextLineStartsWith checks the prefix of the line *after* the line that
@@ -63,12 +72,12 @@ func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
 // calling nextLineStartsWith. Otherwise ErrLineReaderUninitialized will be
 // returned.
 func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader)
-	}
+if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
+l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
+}
 
-	next, err := l.reader.Peek(len(prefix))
-	return l.lineHasPrefix(next, prefix, err)
+next, err := l.reader.Peek(len(prefix))
+return l.lineHasPrefix(next, prefix, err)
 }
 
 // lineHasPrefix checks whether the given line has the given prefix with
@@ -78,14 +87,14 @@ func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
 // lineHasPrefix checks the error to adjust its return value to, e.g., return
 // false and ignore the error when readErr is io.EOF.
 func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (bool, error) {
-	if readErr != nil {
-		if readErr == io.EOF || readErr == bufio.ErrBufferFull {
-			return false, nil
-		}
-		return false, readErr
-	}
+if readErr != nil {
+if readErr == io.EOF || readErr == bufio.ErrBufferFull {
+return false, nil
+}
+return false, readErr
+}
 
-	return bytes.HasPrefix(line, []byte(prefix)), nil
+return bytes.HasPrefix(line, []byte(prefix)), nil
 }
 
 // readLine is a helper that mimics the functionality of calling bufio.Scanner.Scan() and
@@ -93,28 +102,34 @@ func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (b
 // the next line in the Reader with the trailing newline stripped. It will return an
 // io.EOF error when there is nothing left to read (at the start of the function call). It
 // will return any other errors it receives from the underlying call to ReadBytes.
-func readLine(r *bufio.Reader) ([]byte, error) {
-	line_, err := r.ReadBytes('\n')
-	if err == io.EOF {
-		if len(line_) == 0 {
-			return nil, io.EOF
-		}
+func readLine(r *bufio.Reader, keepCR bool) ([]byte, error) {
+line_, err := r.ReadBytes('\n')
+if err == io.EOF {
+if len(line_) == 0 {
+return nil, io.EOF
+}
 
-		// ReadBytes returned io.EOF, because it didn't find another newline, but there is
-		// still the remainder of the file to return as a line.
-		line := line_
-		return line, nil
-	} else if err != nil {
-		return nil, err
-	}
-	line := line_[0 : len(line_)-1]
-	return dropCR(line), nil
+// ReadBytes returned io.EOF, because it didn't find another newline, but there is
+// still the remainder of the file to return as a line.
+line := line_
+if !keepCR {
+return dropCR(line), nil
+}
+return line, nil
+} else if err != nil {
+return nil, err
+}
+line := line_[0 : len(line_)-1]
+if !keepCR {
+return dropCR(line), nil
+}
+return line, nil
 }
 
 // dropCR drops a terminal \r from the data.
 func dropCR(data []byte) []byte {
-	if len(data) > 0 && data[len(data)-1] == '\r' {
-		return data[0 : len(data)-1]
-	}
-	return data
+if len(data) > 0 && data[len(data)-1] == '\r' {
+return data[0 : len(data)-1]
+}
+return data
 }
