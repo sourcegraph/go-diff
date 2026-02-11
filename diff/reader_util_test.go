@@ -217,7 +217,7 @@ func TestReadLine_KeepCR(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(l) != "line1\r" {
-		t.Errorf("expected line1\r, got %q", string(l))
+		t.Errorf("expected line1\\r, got %q", string(l))
 	}
 
 	l, err = readLine(in, true)
@@ -225,6 +225,6 @@ func TestReadLine_KeepCR(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(l) != "line2\r" {
-		t.Errorf("expected line2\r, got %q", string(l))
+		t.Errorf("expected line2\\r, got %q", string(l))
 	}
 }

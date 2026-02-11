@@ -1,7 +1,6 @@
 package diff
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -17,13 +16,24 @@ import (
 // case of per-file errors. If it cannot detect when the diff of the next file
 // begins, the hunks are added to the FileDiff of the previous file.
 func ParseMultiFileDiff(diff []byte) ([]*FileDiff, error) {
-	return NewMultiFileDiffReader(bytes.NewReader(diff)).ReadAllFiles()
+	return ParseMultiFileDiffOptions(diff, ParseOptions{})
+}
+
+// ParseMultiFileDiffOptions parses a multi-file unified diff with the given options.
+func ParseMultiFileDiffOptions(diff []byte, opts ParseOptions) ([]*FileDiff, error) {
+	return NewMultiFileDiffReaderOptions(bytes.NewReader(diff), opts).ReadAllFiles()
 }
 
 // NewMultiFileDiffReader returns a new MultiFileDiffReader that reads
 // a multi-file unified diff from r.
 func NewMultiFileDiffReader(r io.Reader) *MultiFileDiffReader {
-	return &MultiFileDiffReader{reader: newLineReader(r)}
+	return NewMultiFileDiffReaderOptions(r, ParseOptions{})
+}
+
+// NewMultiFileDiffReaderOptions returns a new MultiFileDiffReader that reads
+// a multi-file unified diff from r with the given options.
+func NewMultiFileDiffReaderOptions(r io.Reader, opts ParseOptions) *MultiFileDiffReader {
+	return &MultiFileDiffReader{reader: newLineReaderOptions(r, opts)}
 }
 
 // MultiFileDiffReader reads a multi-file unified diff.
@@ -153,13 +163,24 @@ func (r *MultiFileDiffReader) ReadAllFiles() ([]*FileDiff, error) {
 
 // ParseFileDiff parses a file unified diff.
 func ParseFileDiff(diff []byte) (*FileDiff, error) {
-	return NewFileDiffReader(bytes.NewReader(diff)).Read()
+	return ParseFileDiffOptions(diff, ParseOptions{})
+}
+
+// ParseFileDiffOptions parses a file unified diff with the given options.
+func ParseFileDiffOptions(diff []byte, opts ParseOptions) (*FileDiff, error) {
+	return NewFileDiffReaderOptions(bytes.NewReader(diff), opts).Read()
 }
 
 // NewFileDiffReader returns a new FileDiffReader that reads a file
 // unified diff.
 func NewFileDiffReader(r io.Reader) *FileDiffReader {
-	return &FileDiffReader{reader: &lineReader{reader: bufio.NewReader(r)}}
+	return NewFileDiffReaderOptions(r, ParseOptions{})
+}
+
+// NewFileDiffReaderOptions returns a new FileDiffReader that reads a file
+// unified diff with the given options.
+func NewFileDiffReaderOptions(r io.Reader, opts ParseOptions) *FileDiffReader {
+	return &FileDiffReader{reader: newLineReaderOptions(r, opts)}
 }
 
 // FileDiffReader reads a unified file diff.
@@ -586,7 +607,12 @@ var (
 // only of hunks and not include a file header; if it has a file
 // header, use ParseFileDiff.
 func ParseHunks(diff []byte) ([]*Hunk, error) {
-	r := NewHunksReader(bytes.NewReader(diff))
+	return ParseHunksOptions(diff, ParseOptions{})
+}
+
+// ParseHunksOptions parses hunks from a unified diff with the given options.
+func ParseHunksOptions(diff []byte, opts ParseOptions) ([]*Hunk, error) {
+	r := NewHunksReaderOptions(bytes.NewReader(diff), opts)
 	hunks, err := r.ReadAllHunks()
 	if err != nil {
 		return nil, err
@@ -597,7 +623,13 @@ func ParseHunks(diff []byte) ([]*Hunk, error) {
 // NewHunksReader returns a new HunksReader that reads unified diff hunks
 // from r.
 func NewHunksReader(r io.Reader) *HunksReader {
-	return &HunksReader{reader: &lineReader{reader: bufio.NewReader(r)}}
+	return NewHunksReaderOptions(r, ParseOptions{})
+}
+
+// NewHunksReaderOptions returns a new HunksReader that reads unified diff hunks
+// from r with the given options.
+func NewHunksReaderOptions(r io.Reader, opts ParseOptions) *HunksReader {
+	return &HunksReader{reader: newLineReaderOptions(r, opts)}
 }
 
 // A HunksReader reads hunks from a unified diff.

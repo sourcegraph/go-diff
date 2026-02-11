@@ -15,8 +15,8 @@ type ParseOptions struct {
 //
 // A file unified diff has a header that resembles the following:
 //
-// --- oldname2009-10-11 15:12:20.000000000 -0700
-// +++ newname2009-10-11 15:12:30.000000000 -0700
+//	--- oldname	2009-10-11 15:12:20.000000000 -0700
+//	+++ newname	2009-10-11 15:12:30.000000000 -0700
 type FileDiff struct {
 	// the original name of the file
 	OrigName string
