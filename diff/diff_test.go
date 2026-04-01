@@ -2,6 +2,7 @@ package diff
 
 import (
 	"bytes"
+	"github.com/google/go-cmp/cmp"
 	"io"
 	"io/ioutil"
 	"path/filepath"
@@ -9,8 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func unix(sec int64) *time.Time {
@@ -1121,5 +1120,101 @@ func TestFileDiff_Stat(t *testing.T) {
 			t.Errorf("%s: got - want diff stat\n%s", label, cmp.Diff(test.want, stat))
 			continue
 		}
+	}
+}
+
+func TestParseMultiFileDiff_Comprehensive(t *testing.T) {
+	diffData, err := ioutil.ReadFile(filepath.Join("testdata", "sample_multi_file.diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fds, err := ParseMultiFileDiff(diffData)
+	if err != nil {
+		t.Fatalf("ParseMultiFileDiff failed: %v", err)
+	}
+
+	if len(fds) != 2 {
+		t.Fatalf("Expected 2 file diffs, got %d", len(fds))
+	}
+
+	// Verify first file
+	fd1 := fds[0]
+	if fd1.OrigName != "oldname1" || fd1.NewName != "newname1" {
+		t.Errorf("Unexpected names for file 1: %q -> %q", fd1.OrigName, fd1.NewName)
+	}
+	if len(fd1.Extended) != 3 {
+		t.Errorf("Expected 3 extended headers for file 1, got %d", len(fd1.Extended))
+	}
+
+	if len(fd1.Hunks) != 2 {
+		t.Fatalf("Expected 2 hunks for file 1, got %d", len(fd1.Hunks))
+	}
+
+	h1 := fd1.Hunks[0]
+	if h1.OrigStartLine != 1 || h1.OrigLines != 3 || h1.NewStartLine != 1 || h1.NewLines != 9 {
+		t.Errorf("Unexpected dimensions for file 1, hunk 1: Orig(%d, %d) New(%d, %d)", h1.OrigStartLine, h1.OrigLines, h1.NewStartLine, h1.NewLines)
+	}
+
+	h2 := fd1.Hunks[1]
+	if h2.OrigStartLine != 5 || h2.OrigLines != 16 || h2.NewStartLine != 11 || h2.NewLines != 10 {
+		t.Errorf("Unexpected dimensions for file 1, hunk 2: Orig(%d, %d) New(%d, %d)", h2.OrigStartLine, h2.OrigLines, h2.NewStartLine, h2.NewLines)
+	}
+
+	// Verify second file
+	fd2 := fds[1]
+	if fd2.OrigName != "oldname2" || fd2.NewName != "newname2" {
+		t.Errorf("Unexpected names for file 2: %q -> %q", fd2.OrigName, fd2.NewName)
+	}
+	if len(fd2.Hunks) != 2 {
+		t.Fatalf("Expected 2 hunks for file 2, got %d", len(fd2.Hunks))
+	}
+
+	h3 := fd2.Hunks[0]
+	if h3.OrigStartLine != 1 || h3.OrigLines != 3 || h3.NewStartLine != 1 || h3.NewLines != 9 {
+		t.Errorf("Unexpected dimensions for file 2, hunk 1: Orig(%d, %d) New(%d, %d)", h3.OrigStartLine, h3.OrigLines, h3.NewStartLine, h3.NewLines)
+	}
+}
+
+func TestParseMultiFileDiff_KeepCR_E2E(t *testing.T) {
+	// A full multi-file diff with CRLF line endings
+	input := "--- file1\r\n" +
+		"+++ file1\r\n" +
+		"@@ -1,3 +1,3 @@\r\n" +
+		" line1\r\n" +
+		"-line2\r\n" +
+		"+line2_new\r\n" +
+		" line3\r\n" +
+		"diff --git a/file2 b/file2\r\n" +
+		"new file mode 100644\r\n" +
+		"index 0000000..e69de29\r\n"
+
+	opts := ParseOptions{KeepCR: true}
+	fds, err := ParseMultiFileDiffOptions([]byte(input), opts)
+	if err != nil {
+		t.Fatalf("ParseMultiFileDiffOptions failed: %v", err)
+	}
+
+	if len(fds) != 2 {
+		t.Fatalf("Expected 2 file diffs, got %d", len(fds))
+	}
+
+	// File 1 Verify Hunks contain \r
+	fd1 := fds[0]
+	if len(fd1.Hunks) != 1 {
+		t.Fatalf("Expected 1 hunk for file 1, got %d", len(fd1.Hunks))
+	}
+	h1 := fd1.Hunks[0]
+	if !strings.Contains(string(h1.Body), "\r\n") {
+		t.Errorf("Expected Hunk body to contain CRLF, got: %q", string(h1.Body))
+	}
+
+	// File 2 Verify filename is NOT "file2\r"
+	fd2 := fds[1]
+	if fd2.NewName != "b/file2" {
+		t.Errorf("Expected NewName 'b/file2', got %q", fd2.NewName)
+	}
+	if len(fd2.Extended) != 3 {
+		t.Errorf("Expected 3 extended headers for file 2, got %d", len(fd2.Extended))
 	}
 }

@@ -426,6 +426,7 @@ func readQuotedFilename(text string) (value string, remainder string, err error)
 // valid syntax, it may be impossible to extract filenames; if so, the
 // function returns ("", "", true).
 func parseDiffGitArgs(diffArgs string) (string, string, bool) {
+	diffArgs = strings.TrimSuffix(diffArgs, "\r")
 	length := len(diffArgs)
 	if length < 3 {
 		return "", "", false
@@ -561,6 +562,7 @@ func handleEmpty(fd *FileDiff) (wasEmpty bool) {
 				return
 			}
 			rawFilename := header[len(prefix):]
+			rawFilename = strings.TrimSuffix(rawFilename, "\r")
 
 			// extract the filename prefix (e.g. "a/") from the 'diff --git' line.
 			var prefixLetterIndex int
@@ -733,7 +735,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 				// handle that case.
 				return r.hunk, &ParseError{r.line, r.offset, &ErrBadHunkLine{Line: line}}
 			}
-			if bytes.Equal(line, []byte(noNewlineMessage)) {
+			if bytes.Equal(bytes.TrimSuffix(line, []byte("\r")), []byte(noNewlineMessage)) {
 				if lastLineFromOrig {
 					// Retain the newline in the body (otherwise the
 					// diff line would be like "-a+b", where "+b" is
@@ -787,6 +789,7 @@ func linePrefix(c byte) bool {
 // if its value is 1. normalizeHeader returns an error if the header
 // is not in the correct format.
 func normalizeHeader(header string) (string, string, error) {
+	header = strings.TrimSuffix(header, "\r")
 	// Split the header into five parts: the first '@@', the two
 	// ranges, the last '@@', and the optional section.
 	pieces := strings.SplitN(header, " ", 5)
@@ -847,7 +850,8 @@ func parseOnlyInMessage(line []byte) (bool, []byte, []byte) {
 	if idx < 0 {
 		return false, nil, nil
 	}
-	return true, line[:idx], line[idx+2:]
+	filename := bytes.TrimSuffix(line[idx+2:], []byte("\r"))
+	return true, line[:idx], filename
 }
 
 // A ParseError is a description of a unified diff syntax error.
