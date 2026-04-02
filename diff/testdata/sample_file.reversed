@@ -1,0 +1,31 @@
+--- newname	2009-10-11 15:12:30.000000000 +0000
++++ oldname	2009-10-11 15:12:20.000000000 +0000
+@@ -1,9 +1,3 @@
+-This is an important
+-notice! It should
+-therefore be located at
+-the beginning of this
+-document!
+-
+ This part of the
+ document has stayed the
+ same from version to
+@@ -11,10 +5,16 @@
+ be shown if it doesn't
+ change.  Otherwise, that
+ would not be helping to
+-compress anything.
++compress the size of the
++changes.
++
++This paragraph contains
++text that is outdated.
++It will be deleted in the
++near future.
+ 
+ It is important to spell
+-check this document. On
++check this dokument. On
+ the other hand, a
+ misspelled word isn't
+ the end of the world.
