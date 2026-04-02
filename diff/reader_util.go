@@ -31,12 +31,16 @@ type lineReader struct {
 	keepCR bool
 }
 
-// readLine returns the next unconsumed line and advances the internal cache of
-// the lineReader.
-func (l *lineReader) readLine() ([]byte, error) {
+func (l *lineReader) ensureCachedNextLine() {
 	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
 		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
 	}
+}
+
+// readLine returns the next unconsumed line and advances the internal cache of
+// the lineReader.
+func (l *lineReader) readLine() ([]byte, error) {
+	l.ensureCachedNextLine()
 
 	if l.cachedNextLineErr != nil {
 		return nil, l.cachedNextLineErr
@@ -55,9 +59,7 @@ func (l *lineReader) readLine() ([]byte, error) {
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
 func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
-	}
+	l.ensureCachedNextLine()
 
 	return l.lineHasPrefix(l.cachedNextLine, prefix, l.cachedNextLineErr)
 }
@@ -68,9 +70,7 @@ func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
 func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
-	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
-		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
-	}
+	l.ensureCachedNextLine()
 
 	next, err := l.reader.Peek(len(prefix))
 	return l.lineHasPrefix(next, prefix, err)
