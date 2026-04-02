@@ -67,10 +67,6 @@ func (l *lineReader) nextLineStartsWith(prefix string) (bool, error) {
 //
 // io.EOF and bufio.ErrBufferFull errors are ignored so that the function can
 // be used when at the end of the file.
-//
-// The lineReader MUST be initialized by calling readLine at least once before
-// calling nextLineStartsWith. Otherwise ErrLineReaderUninitialized will be
-// returned.
 func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
 	if l.cachedNextLine == nil && l.cachedNextLineErr == nil {
 		l.cachedNextLine, l.cachedNextLineErr = readLine(l.reader, l.keepCR)
