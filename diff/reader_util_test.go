@@ -51,7 +51,7 @@ index 0000000..3be2928`,
 			in := bufio.NewReader(strings.NewReader(test.input))
 			out := []string{}
 			for {
-				l, err := readLine(in)
+				l, err := readLine(in, false)
 				if err == io.EOF {
 					break
 				}
@@ -205,5 +205,26 @@ ccc rest of line`
 			t.Fatalf("readLine returned unexpected error. got=%s, want=%s", err, tc.wantReadLineErr)
 		}
 
+	}
+}
+
+func TestReadLine_KeepCR(t *testing.T) {
+	input := "line1\r\nline2\r\n"
+	in := bufio.NewReader(strings.NewReader(input))
+
+	l, err := readLine(in, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(l) != "line1\r" {
+		t.Errorf("expected line1\\r, got %q", string(l))
+	}
+
+	l, err = readLine(in, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(l) != "line2\r" {
+		t.Errorf("expected line2\\r, got %q", string(l))
 	}
 }
