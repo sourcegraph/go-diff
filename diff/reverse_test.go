@@ -144,3 +144,75 @@ func TestReverseMultiFileDiff(t *testing.T) {
 		}
 	}
 }
+
+func TestReverseRoundTripOnTestdata(t *testing.T) {
+	fixtures, err := filepath.Glob(filepath.Join("testdata", "*.diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	skipped := map[string]bool{
+		"empty.diff":            true,
+		"empty_new.diff":        true,
+		"empty_orig.diff":       true,
+		"sample_bad_hunks.diff": true,
+	}
+
+	for _, fixture := range fixtures {
+		fixture := fixture
+		name := filepath.Base(fixture)
+
+		t.Run(name, func(t *testing.T) {
+			data, err := os.ReadFile(fixture)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if fileDiffs, err := ParseMultiFileDiff(data); err == nil && len(fileDiffs) > 0 {
+				reversed, err := ReverseMultiFileDiff(fileDiffs)
+				if err != nil {
+					t.Fatalf("first reverse: %s", err)
+				}
+				roundTrip, err := ReverseMultiFileDiff(reversed)
+				if err != nil {
+					t.Fatalf("second reverse: %s", err)
+				}
+				if diff := cmp.Diff(fileDiffs, roundTrip); diff != "" {
+					t.Fatalf("double reverse did not restore original file diffs:\n%s", diff)
+				}
+				return
+			}
+
+			if hunks, err := ParseHunks(data); err == nil && len(hunks) > 0 {
+				var reversed []*Hunk
+				for _, hunk := range hunks {
+					inv, err := reverseHunk(hunk)
+					if err != nil {
+						t.Fatalf("first reverse: %s", err)
+					}
+					reversed = append(reversed, inv)
+				}
+
+				var roundTrip []*Hunk
+				for _, hunk := range reversed {
+					inv, err := reverseHunk(hunk)
+					if err != nil {
+						t.Fatalf("second reverse: %s", err)
+					}
+					roundTrip = append(roundTrip, inv)
+				}
+
+				if diff := cmp.Diff(hunks, roundTrip); diff != "" {
+					t.Fatalf("double reverse did not restore original hunks:\n%s", diff)
+				}
+				return
+			}
+
+			if skipped[name] {
+				return
+			}
+
+			t.Fatalf("fixture did not contain parseable file diffs or hunks")
+		})
+	}
+}

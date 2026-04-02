@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"regexp"
 )
 
 // ReverseFileDiff takes a diff.FileDiff, and returns the reverse operation.
@@ -49,8 +48,13 @@ func ReverseMultiFileDiff(fds []*FileDiff) ([]*FileDiff, error) {
 //
 // A missing newline in orig is represented in a Hunk by OrigNoNewlineAt,
 // but is represented here as a missing newline.
+type contextLine struct {
+	body []byte
+	bare bool
+}
+
 type subhunk struct {
-	context [][]byte
+	context []contextLine
 	orig    [][]byte
 	new     [][]byte
 }
@@ -77,8 +81,12 @@ func reverseHunk(forward *Hunk) (*Hunk, error) {
 			new:     sub.orig,
 		}
 		for _, line := range invSub.context {
+			if line.bare {
+				reverse.Body = append(reverse.Body, line.body...)
+				continue
+			}
 			reverse.Body = append(reverse.Body, ' ')
-			reverse.Body = append(reverse.Body, line...)
+			reverse.Body = append(reverse.Body, line.body...)
 		}
 		for _, line := range invSub.orig {
 			reverse.Body = append(reverse.Body, '-')
@@ -98,14 +106,47 @@ func reverseHunk(forward *Hunk) (*Hunk, error) {
 	return &reverse, nil
 }
 
-var subhunkLineRe = regexp.MustCompile(`^.[^\n]*(\n|$)`)
+func extractContextLines(from *[]byte) []contextLine {
+	var lines []contextLine
+	for len(*from) > 0 {
+		if (*from)[0] == '\n' {
+			lines = append(lines, contextLine{body: []byte{'\n'}, bare: true})
+			*from = (*from)[1:]
+			continue
+		}
+		if (*from)[0] != ' ' {
+			break
+		}
+
+		newline := bytes.IndexByte(*from, '\n')
+		if newline < 0 {
+			lines = append(lines, contextLine{body: (*from)[1:]})
+			*from = nil
+			continue
+		}
+
+		lines = append(lines, contextLine{body: (*from)[1 : newline+1]})
+		*from = (*from)[newline+1:]
+	}
+	return lines
+}
 
 func extractLinesStartingWith(from *[]byte, startingWith byte) [][]byte {
 	var lines [][]byte
-	for len(*from) > 0 && (*from)[0] == startingWith {
-		line := subhunkLineRe.Find(*from)
-		lines = append(lines, line[1:])
-		*from = (*from)[len(line):]
+	for len(*from) > 0 {
+		if (*from)[0] != startingWith {
+			break
+		}
+
+		newline := bytes.IndexByte(*from, '\n')
+		if newline < 0 {
+			lines = append(lines, (*from)[1:])
+			*from = nil
+			continue
+		}
+
+		lines = append(lines, (*from)[1:newline+1])
+		*from = (*from)[newline+1:]
 	}
 	return lines
 }
@@ -123,7 +164,7 @@ func toSubhunks(hunk *Hunk) ([]subhunk, error) {
 	}
 	for len(body) > 0 {
 		sh := subhunk{
-			context: extractLinesStartingWith(&body, ' '),
+			context: extractContextLines(&body),
 			orig:    extractLinesStartingWith(&body, '-'),
 			new:     extractLinesStartingWith(&body, '+'),
 		}
