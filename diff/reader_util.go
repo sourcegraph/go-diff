@@ -99,23 +99,16 @@ func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (b
 // io.EOF error when there is nothing left to read (at the start of the function call). It
 // will return any other errors it receives from the underlying call to ReadBytes.
 func readLine(r *bufio.Reader, keepCR bool) ([]byte, error) {
-	line_, err := r.ReadBytes('\n')
-	if err == io.EOF {
-		if len(line_) == 0 {
-			return nil, io.EOF
-		}
-
-		// ReadBytes returned io.EOF, because it didn't find another newline, but there is
-		// still the remainder of the file to return as a line.
-		line := line_
-		if !keepCR {
-			return dropCR(line), nil
-		}
-		return line, nil
-	} else if err != nil {
+	line, err := r.ReadBytes('\n')
+	if err == io.EOF && len(line) == 0 {
+		return nil, io.EOF
+	}
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	line := line_[0 : len(line_)-1]
+	if line[len(line)-1] == '\n' {
+		line = line[:len(line)-1]
+	}
 	if !keepCR {
 		return dropCR(line), nil
 	}
