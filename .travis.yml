@@ -1,7 +1,7 @@
 sudo: false
 language: go
 go:
-  - "1.14.x"
+  - "1.24.x"
 script:
   - GO111MODULE=on go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d -s .)
