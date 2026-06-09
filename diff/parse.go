@@ -74,9 +74,11 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 
 	fd, err := fr.ReadAllHeaders()
 	if err != nil {
-		switch e := err.(type) {
-		case *ParseError:
-			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
+		var pe *ParseError
+		var oe OverflowError
+		switch {
+		case errors.As(err, &pe):
+			if errors.Is(pe.Err, ErrNoFileHeader) || errors.Is(pe.Err, ErrExtendedHeadersEOF) {
 				// Any non-diff content preceding a valid diff is included in the
 				// extended headers of the following diff. In this way, mixed diff /
 				// non-diff content can be parsed. Trailing non-diff content is
@@ -91,8 +93,8 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 			}
 			return nil, "", err
 
-		case OverflowError:
-			r.nextFileFirstLine = []byte(e)
+		case errors.As(err, &oe):
+			r.nextFileFirstLine = []byte(oe)
 			return fd, "", nil
 
 		default:
@@ -124,8 +126,10 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 		r.line = fr.line
 		r.offset = fr.offset
 		if err != nil {
-			if e0, ok := err.(*ParseError); ok {
-				if e, ok := e0.Err.(*ErrBadHunkLine); ok {
+			var e0 *ParseError
+			if errors.As(err, &e0) {
+				var e *ErrBadHunkLine
+				if errors.As(e0.Err, &e) {
 					// This just means we finished reading the hunks for the
 					// current file. See the ErrBadHunkLine doc for more info.
 					r.nextFileFirstLine = e.Line
@@ -224,13 +228,15 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	fd := &FileDiff{}
 
 	fd.Extended, err = r.ReadExtendedHeaders()
-	if pe, ok := err.(*ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
+	var pe *ParseError
+	var oe OverflowError
+	if errors.As(err, &pe) && errors.Is(pe.Err, ErrExtendedHeadersEOF) {
 		wasEmpty := handleEmpty(fd)
 		if wasEmpty {
 			return fd, nil
 		}
 		return fd, err
-	} else if _, ok := err.(OverflowError); ok {
+	} else if errors.As(err, &oe) {
 		handleEmpty(fd)
 		return fd, err
 	} else if err != nil {
