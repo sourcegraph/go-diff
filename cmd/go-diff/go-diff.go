@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -45,7 +46,7 @@ func main() {
 		if fdiff != nil {
 			label = fmt.Sprintf("orig(%s) new(%s)", fdiff.OrigName, fdiff.NewName)
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

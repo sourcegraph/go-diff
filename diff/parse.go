@@ -76,7 +76,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	if err != nil {
 		switch e := err.(type) {
 		case *ParseError:
-			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
+			if errors.Is(e.Err, ErrNoFileHeader) || errors.Is(e.Err, ErrExtendedHeadersEOF) {
 				// Any non-diff content preceding a valid diff is included in the
 				// extended headers of the following diff. In this way, mixed diff /
 				// non-diff content can be parsed. Trailing non-diff content is
@@ -114,7 +114,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	// need to perform the check here.
 	hr := fr.HunksReader()
 	line, err := r.reader.readLine()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fd, "", err
 	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
@@ -152,7 +152,7 @@ func (r *MultiFileDiffReader) ReadAllFiles() ([]*FileDiff, error) {
 		if d != nil {
 			ds = append(ds, d)
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return ds, nil
 		}
 		if err != nil {
@@ -224,7 +224,7 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	fd := &FileDiff{}
 
 	fd.Extended, err = r.ReadExtendedHeaders()
-	if pe, ok := err.(*ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
+	if pe, ok := err.(*ParseError); ok && errors.Is(pe.Err, ErrExtendedHeadersEOF) {
 		wasEmpty := handleEmpty(fd)
 		if wasEmpty {
 			return fd, nil
@@ -305,7 +305,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	if r.fileHeaderLine == nil {
 		var err error
 		line, err = r.reader.readLine()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
 			return "", nil, err
@@ -363,7 +363,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 		if r.fileHeaderLine == nil {
 			var err error
 			line, err = r.reader.readLine()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
 			} else if err != nil {
 				return xheaders, err
@@ -660,7 +660,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		} else {
 			line, err = r.reader.readLine()
 			if err != nil {
-				if err == io.EOF && r.hunk != nil {
+				if errors.Is(err, io.EOF) && r.hunk != nil {
 					return r.hunk, nil
 				}
 				return nil, err
@@ -825,7 +825,7 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 	linesRead := int32(0)
 	for {
 		hunk, err := r.ReadHunk()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return hunks, nil
 		}
 		if hunk != nil {
