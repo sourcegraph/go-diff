@@ -2,7 +2,7 @@ package diff
 
 import (
 	"bytes"
-	"github.com/google/go-cmp/cmp"
+	"errors"
 	"io"
 	"io/ioutil"
 	"path/filepath"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func unix(sec int64) *time.Time {
@@ -975,7 +977,7 @@ func TestParseMultiFileDiffAndPrintMultiFileDiffIncludingTrailingContent(t *test
 		if fd != nil {
 			diffs = append(diffs, fd)
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

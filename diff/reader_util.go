@@ -84,7 +84,7 @@ func (l *lineReader) nextNextLineStartsWith(prefix string) (bool, error) {
 // false and ignore the error when readErr is io.EOF.
 func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (bool, error) {
 	if readErr != nil {
-		if readErr == io.EOF || readErr == bufio.ErrBufferFull {
+		if errors.Is(readErr, io.EOF) || errors.Is(readErr, bufio.ErrBufferFull) {
 			return false, nil
 		}
 		return false, readErr
@@ -100,10 +100,10 @@ func (l *lineReader) lineHasPrefix(line []byte, prefix string, readErr error) (b
 // will return any other errors it receives from the underlying call to ReadBytes.
 func readLine(r *bufio.Reader, keepCR bool) ([]byte, error) {
 	line, err := r.ReadBytes('\n')
-	if err == io.EOF && len(line) == 0 {
+	if errors.Is(err, io.EOF) && len(line) == 0 {
 		return nil, io.EOF
 	}
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 	if line[len(line)-1] == '\n' {

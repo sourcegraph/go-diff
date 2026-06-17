@@ -2,6 +2,7 @@ package diff
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -52,7 +53,7 @@ index 0000000..3be2928`,
 			out := []string{}
 			for {
 				l, err := readLine(in, false)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {
@@ -94,11 +95,11 @@ index 0000000..3be2928
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in.cachedNextLineErr != io.EOF {
+	if !errors.Is(in.cachedNextLineErr, io.EOF) {
 		t.Fatalf("lineReader has wrong cachedNextLineErr: %s", in.cachedNextLineErr)
 	}
 	_, err = in.readLine()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Fatalf("readLine did not return io.EOF: %s", err)
 	}
 }

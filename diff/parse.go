@@ -74,9 +74,11 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 
 	fd, err := fr.ReadAllHeaders()
 	if err != nil {
-		switch e := err.(type) {
-		case *ParseError:
-			if e.Err == ErrNoFileHeader || e.Err == ErrExtendedHeadersEOF {
+		var e *ParseError
+		var oe OverflowError
+		switch {
+		case errors.As(err, &e):
+			if errors.Is(e.Err, ErrNoFileHeader) || errors.Is(e.Err, ErrExtendedHeadersEOF) {
 				// Any non-diff content preceding a valid diff is included in the
 				// extended headers of the following diff. In this way, mixed diff /
 				// non-diff content can be parsed. Trailing non-diff content is
@@ -91,8 +93,8 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 			}
 			return nil, "", err
 
-		case OverflowError:
-			r.nextFileFirstLine = []byte(e)
+		case errors.As(err, &oe):
+			r.nextFileFirstLine = []byte(oe)
 			return fd, "", nil
 
 		default:
@@ -114,7 +116,7 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 	// need to perform the check here.
 	hr := fr.HunksReader()
 	line, err := r.reader.readLine()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fd, "", err
 	}
 	line = bytes.TrimSuffix(line, []byte{'\n'})
@@ -124,13 +126,12 @@ func (r *MultiFileDiffReader) ReadFileWithTrailingContent() (*FileDiff, string, 
 		r.line = fr.line
 		r.offset = fr.offset
 		if err != nil {
-			if e0, ok := err.(*ParseError); ok {
-				if e, ok := e0.Err.(*ErrBadHunkLine); ok {
-					// This just means we finished reading the hunks for the
-					// current file. See the ErrBadHunkLine doc for more info.
-					r.nextFileFirstLine = e.Line
-					return fd, "", nil
-				}
+			var e *ErrBadHunkLine
+			if errors.As(err, &e) {
+				// This just means we finished reading the hunks for the
+				// current file. See the ErrBadHunkLine doc for more info.
+				r.nextFileFirstLine = e.Line
+				return fd, "", nil
 			}
 			return nil, "", err
 		}
@@ -152,7 +153,7 @@ func (r *MultiFileDiffReader) ReadAllFiles() ([]*FileDiff, error) {
 		if d != nil {
 			ds = append(ds, d)
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return ds, nil
 		}
 		if err != nil {
@@ -224,13 +225,15 @@ func (r *FileDiffReader) ReadAllHeaders() (*FileDiff, error) {
 	fd := &FileDiff{}
 
 	fd.Extended, err = r.ReadExtendedHeaders()
-	if pe, ok := err.(*ParseError); ok && pe.Err == ErrExtendedHeadersEOF {
+	var pe *ParseError
+	var oe OverflowError
+	if errors.As(err, &pe) && errors.Is(pe.Err, ErrExtendedHeadersEOF) {
 		wasEmpty := handleEmpty(fd)
 		if wasEmpty {
 			return fd, nil
 		}
 		return fd, err
-	} else if _, ok := err.(OverflowError); ok {
+	} else if errors.As(err, &oe) {
 		handleEmpty(fd)
 		return fd, err
 	} else if err != nil {
@@ -305,7 +308,7 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	if r.fileHeaderLine == nil {
 		var err error
 		line, err = r.reader.readLine()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return "", nil, &ParseError{r.line, r.offset, ErrNoFileHeader}
 		} else if err != nil {
 			return "", nil, err
@@ -363,7 +366,7 @@ func (r *FileDiffReader) ReadExtendedHeaders() ([]string, error) {
 		if r.fileHeaderLine == nil {
 			var err error
 			line, err = r.reader.readLine()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return xheaders, &ParseError{r.line, r.offset, ErrExtendedHeadersEOF}
 			} else if err != nil {
 				return xheaders, err
@@ -660,7 +663,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 		} else {
 			line, err = r.reader.readLine()
 			if err != nil {
-				if err == io.EOF && r.hunk != nil {
+				if errors.Is(err, io.EOF) && r.hunk != nil {
 					return r.hunk, nil
 				}
 				return nil, err
@@ -825,7 +828,7 @@ func (r *HunksReader) ReadAllHunks() ([]*Hunk, error) {
 	linesRead := int32(0)
 	for {
 		hunk, err := r.ReadHunk()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return hunks, nil
 		}
 		if hunk != nil {
@@ -864,6 +867,10 @@ type ParseError struct {
 func (e *ParseError) Error() string {
 	return fmt.Sprintf("line %d, char %d: %s", e.Line, e.Offset, e.Err)
 }
+
+// Unwrap returns the underlying error so it can be inspected with
+// errors.Is and errors.As.
+func (e *ParseError) Unwrap() error { return e.Err }
 
 // ErrNoHunkHeader indicates that a unified diff hunk header was
 // expected but not found during parsing.
