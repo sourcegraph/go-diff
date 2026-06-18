@@ -679,7 +679,7 @@ func (r *HunksReader) ReadHunk() (*Hunk, error) {
 
 			// Parse hunk header.
 			r.hunk = &Hunk{}
-			items := []interface{}{
+			items := []any{
 				&r.hunk.OrigStartLine, &r.hunk.OrigLines,
 				&r.hunk.NewStartLine, &r.hunk.NewLines,
 			}
@@ -846,12 +846,12 @@ func parseOnlyInMessage(line []byte) (bool, []byte, []byte) {
 		return false, nil, nil
 	}
 	line = line[len(onlyInMessagePrefix):]
-	idx := bytes.Index(line, []byte(": "))
-	if idx < 0 {
+	before, after, ok := bytes.Cut(line, []byte(": "))
+	if !ok {
 		return false, nil, nil
 	}
-	filename := bytes.TrimSuffix(line[idx+2:], []byte("\r"))
-	return true, line[:idx], filename
+	filename := bytes.TrimSuffix(after, []byte("\r"))
+	return true, before, filename
 }
 
 // A ParseError is a description of a unified diff syntax error.
