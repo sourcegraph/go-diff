@@ -77,7 +77,7 @@ index 0000000..3be2928
 
 	in := newLineReader(strings.NewReader(input))
 	out := []string{}
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		l, err := in.readLine()
 		if err != nil {
 			t.Fatal(err)

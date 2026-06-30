@@ -159,7 +159,6 @@ func TestReverseRoundTripOnTestdata(t *testing.T) {
 	}
 
 	for _, fixture := range fixtures {
-		fixture := fixture
 		name := filepath.Base(fixture)
 
 		t.Run(name, func(t *testing.T) {
