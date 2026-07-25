@@ -91,3 +91,16 @@ func TestParseDiffGitArgs_Unsuccessful(t *testing.T) {
 		}
 	}
 }
+
+// Short, space-heavy args reach the ambiguous unquoted-with-spaces branch with a
+// filename shorter than the "a/"/"b/" prefixes it is compared against. The syntax
+// is valid but no filename can be extracted, so the function must return
+// ("", "", true) rather than panicking on the prefix slice.
+func TestParseDiffGitArgs_ShortAmbiguous(t *testing.T) {
+	for _, input := range []string{`x  `, `a  `, `ab   `} {
+		first, second, success := parseDiffGitArgs(input)
+		if !success || first != "" || second != "" {
+			t.Errorf("`diff --git %s`: expected (\"\", \"\", true), got (%q, %q, %v)", input, first, second, success)
+		}
+	}
+}
