@@ -466,9 +466,7 @@ func parseDiffGitArgs(diffArgs string) (string, string, bool) {
 				return first, second, true
 			}
 			// If the names don't have the a/ and b/ prefixes and they're equal, proceed.
-			// first and second have equal length here; guard the prefix slices so a
-			// name shorter than "a/" cannot panic.
-			if len(first) >= 2 && !(first[:2] == "a/" && second[:2] == "b/") && first == second {
+			if !(strings.HasPrefix(first, "a/") && strings.HasPrefix(second, "b/")) && first == second {
 				return first, second, true
 			}
 		}

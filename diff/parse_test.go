@@ -104,3 +104,14 @@ func TestParseDiffGitArgs_ShortAmbiguous(t *testing.T) {
 		}
 	}
 }
+
+func TestParseFileDiff_ShortAmbiguousDiffGitArgs(t *testing.T) {
+	input := []byte("diff --git x  \ndeleted file mode 100644\nindex e69de29..0000000\n")
+	fileDiff, err := ParseFileDiff(input)
+	if err != nil {
+		t.Fatalf("ParseFileDiff: expected success, got %s", err)
+	}
+	if fileDiff.OrigName != "" || fileDiff.NewName != "/dev/null" {
+		t.Errorf("ParseFileDiff: expected empty original name and /dev/null new name, got %q and %q", fileDiff.OrigName, fileDiff.NewName)
+	}
+}
