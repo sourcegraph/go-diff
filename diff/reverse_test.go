@@ -290,8 +290,8 @@ func TestReverseFileDiffRejectsCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ReverseFileDiff(fd); err == nil {
-		t.Fatal("ReverseFileDiff succeeded for a copy diff")
+	if _, err := ReverseFileDiff(fd); err != ErrCannotReverseCopy {
+		t.Fatalf("ReverseFileDiff error = %v, want ErrCannotReverseCopy", err)
 	}
 }
 

@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// ErrCannotReverseCopy is returned when a Git copy diff cannot be reversed.
+var ErrCannotReverseCopy = errors.New("cannot reverse a git copy diff")
+
 // ReverseFileDiff takes a diff.FileDiff and returns the reverse operation.
 // This is a FileDiff that undoes the edit of the original. Git copy diffs
 // cannot be reversed because they do not contain enough information to delete
@@ -50,7 +53,7 @@ func reverseExtendedHeaders(headers []string) ([]string, error) {
 		case strings.HasPrefix(header, "index "):
 			reversed[i] = reverseIndexHeader(header)
 		case strings.HasPrefix(header, "copy from "), strings.HasPrefix(header, "copy to "):
-			return nil, errors.New("cannot reverse a git copy diff")
+			return nil, ErrCannotReverseCopy
 		}
 	}
 	swapHeaderValues(reversed, "old mode ", "new mode ")
