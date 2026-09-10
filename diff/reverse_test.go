@@ -169,6 +169,13 @@ func TestReverseRoundTripOnTestdata(t *testing.T) {
 			}
 
 			if fileDiffs, err := ParseMultiFileDiff(data); err == nil && len(fileDiffs) > 0 {
+				if name == "complicated_filenames.diff" {
+					if _, err := ReverseMultiFileDiff(fileDiffs); err == nil {
+						t.Fatal("reversing fixture with copy diffs succeeded")
+					}
+					return
+				}
+
 				reversed, err := ReverseMultiFileDiff(fileDiffs)
 				if err != nil {
 					t.Fatalf("first reverse: %s", err)
@@ -239,14 +246,14 @@ func TestReverseFileDiffExtendedHeaders(t *testing.T) {
 			want:  []string{"diff --git a/old b/new", "similarity index 70%", "rename from new", "rename to old", "index 8b14c4f..94954ab 100644"},
 		},
 		{
-			name:  "copy",
-			input: []string{"diff --git a/old b/new", "similarity index 100%", "copy from old", "copy to new"},
-			want:  []string{"diff --git a/old b/new", "similarity index 100%", "copy from new", "copy to old"},
-		},
-		{
 			name:  "mode change",
 			input: []string{"diff --git a/f b/f", "old mode 100644", "new mode 100755"},
 			want:  []string{"diff --git a/f b/f", "old mode 100755", "new mode 100644"},
+		},
+		{
+			name:  "CRLF index",
+			input: []string{"diff --git a/f b/f\r", "index 94954ab..8b14c4f 100644\r"},
+			want:  []string{"diff --git a/f b/f\r", "index 8b14c4f..94954ab 100644\r"},
 		},
 		{
 			name:  "no extended headers",
@@ -274,6 +281,17 @@ func TestReverseFileDiffExtendedHeaders(t *testing.T) {
 		if d := cmp.Diff(orig, fd.Extended); d != "" {
 			t.Errorf("%s: ReverseFileDiff mutated its input (-want +got):\n%s", test.name, d)
 		}
+	}
+}
+
+func TestReverseFileDiffRejectsCopy(t *testing.T) {
+	input := []byte("diff --git a/old b/new\nsimilarity index 100%\ncopy from old\ncopy to new\n")
+	fd, err := ParseFileDiff(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReverseFileDiff(fd); err == nil {
+		t.Fatal("ReverseFileDiff succeeded for a copy diff")
 	}
 }
 

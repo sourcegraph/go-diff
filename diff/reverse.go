@@ -7,15 +7,21 @@ import (
 	"strings"
 )
 
-// ReverseFileDiff takes a diff.FileDiff, and returns the reverse operation.
-// This is a FileDiff that undoes the edit of the original.
+// ReverseFileDiff takes a diff.FileDiff and returns the reverse operation.
+// This is a FileDiff that undoes the edit of the original. Git copy diffs
+// cannot be reversed because they do not contain enough information to delete
+// the copied file.
 func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
+	extended, err := reverseExtendedHeaders(fd.Extended)
+	if err != nil {
+		return nil, err
+	}
 	reverse := FileDiff{
 		OrigName: fd.NewName,
 		OrigTime: fd.NewTime,
 		NewName:  fd.OrigName,
 		NewTime:  fd.OrigTime,
-		Extended: reverseExtendedHeaders(fd.Extended),
+		Extended: extended,
 	}
 	for _, hunk := range fd.Hunks {
 		invHunk, err := reverseHunk(hunk)
@@ -27,12 +33,11 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 	return &reverse, nil
 }
 
-// reverseExtendedHeaders reverses the direction encoded in git's extended
-// header lines, matching what "git diff -R" emits.
-func reverseExtendedHeaders(headers []string) []string {
+// reverseExtendedHeaders reverses the direction encoded in git's extended headers.
+func reverseExtendedHeaders(headers []string) ([]string, error) {
 	// handleEmpty gates on the same prefix when it reads the direction back out.
 	if len(headers) == 0 || !strings.HasPrefix(headers[0], "diff --git ") {
-		return headers
+		return headers, nil
 	}
 	reversed := make([]string, len(headers))
 	copy(reversed, headers)
@@ -44,12 +49,13 @@ func reverseExtendedHeaders(headers []string) []string {
 			reversed[i] = "new file mode " + header[len("deleted file mode "):]
 		case strings.HasPrefix(header, "index "):
 			reversed[i] = reverseIndexHeader(header)
+		case strings.HasPrefix(header, "copy from "), strings.HasPrefix(header, "copy to "):
+			return nil, errors.New("cannot reverse a git copy diff")
 		}
 	}
 	swapHeaderValues(reversed, "old mode ", "new mode ")
 	swapHeaderValues(reversed, "rename from ", "rename to ")
-	swapHeaderValues(reversed, "copy from ", "copy to ")
-	return reversed
+	return reversed, nil
 }
 
 // swapHeaderValues exchanges the values of the first "from" header and the
@@ -74,20 +80,14 @@ func swapHeaderValues(headers []string, fromPrefix, toPrefix string) {
 // header, leaving the trailing mode (if any) alone.
 func reverseIndexHeader(header string) string {
 	const prefix = "index "
-	rest := header[len(prefix):]
-	var suffix string
-	if strings.HasSuffix(rest, "\r") {
-		rest, suffix = rest[:len(rest)-1], "\r"
-	}
-	var mode string
-	if i := strings.IndexByte(rest, ' '); i >= 0 {
-		rest, mode = rest[:i], rest[i:]
-	}
-	i := strings.Index(rest, "..")
-	if i < 0 {
+	oldHash, newHash, ok := strings.Cut(header[len(prefix):], "..")
+	if !ok || strings.ContainsAny(oldHash, " \r") {
 		return header
 	}
-	return prefix + rest[i+2:] + ".." + rest[:i] + mode + suffix
+	if i := strings.IndexAny(newHash, " \r"); i >= 0 {
+		return prefix + newHash[:i] + ".." + oldHash + newHash[i:]
+	}
+	return prefix + newHash + ".." + oldHash
 }
 
 // ReverseMultiFileDiff reverses a series of FileDiffs.
