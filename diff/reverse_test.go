@@ -233,27 +233,27 @@ func TestReverseFileDiffExtendedHeaders(t *testing.T) {
 		{
 			name:  "new file",
 			input: []string{"diff --git a/f b/f", "new file mode 100644", "index 0000000..587be6b"},
-			want:  []string{"diff --git a/f b/f", "deleted file mode 100644", "index 587be6b..0000000"},
+			want:  []string{"diff --git b/f a/f", "deleted file mode 100644", "index 587be6b..0000000"},
 		},
 		{
 			name:  "deleted file",
 			input: []string{"diff --git a/f b/f", "deleted file mode 100644", "index 587be6b..0000000"},
-			want:  []string{"diff --git a/f b/f", "new file mode 100644", "index 0000000..587be6b"},
+			want:  []string{"diff --git b/f a/f", "new file mode 100644", "index 0000000..587be6b"},
 		},
 		{
 			name:  "rename",
 			input: []string{"diff --git a/old b/new", "similarity index 70%", "rename from old", "rename to new", "index 94954ab..8b14c4f 100644"},
-			want:  []string{"diff --git a/old b/new", "similarity index 70%", "rename from new", "rename to old", "index 8b14c4f..94954ab 100644"},
+			want:  []string{"diff --git b/new a/old", "similarity index 70%", "rename from new", "rename to old", "index 8b14c4f..94954ab 100644"},
 		},
 		{
 			name:  "mode change",
 			input: []string{"diff --git a/f b/f", "old mode 100644", "new mode 100755"},
-			want:  []string{"diff --git a/f b/f", "old mode 100755", "new mode 100644"},
+			want:  []string{"diff --git b/f a/f", "old mode 100755", "new mode 100644"},
 		},
 		{
 			name:  "CRLF index",
 			input: []string{"diff --git a/f b/f\r", "index 94954ab..8b14c4f 100644\r"},
-			want:  []string{"diff --git a/f b/f\r", "index 8b14c4f..94954ab 100644\r"},
+			want:  []string{"diff --git b/f a/f\r", "index 8b14c4f..94954ab 100644\r"},
 		},
 		{
 			name:  "no extended headers",
@@ -281,6 +281,64 @@ func TestReverseFileDiffExtendedHeaders(t *testing.T) {
 		if d := cmp.Diff(orig, fd.Extended); d != "" {
 			t.Errorf("%s: ReverseFileDiff mutated its input (-want +got):\n%s", test.name, d)
 		}
+	}
+}
+
+func TestReverseFileDiffGitHeader(t *testing.T) {
+	// These expected lines were captured from git diff -R. Git is deliberately
+	// not invoked by the test.
+	tests := []struct {
+		name             string
+		input, orig, new string
+		want             string
+	}{
+		{
+			name:  "unquoted paths with spaces disambiguated by parsed names",
+			input: "diff --git a/old name.txt b/new name.txt",
+			orig:  "a/old name.txt",
+			new:   "b/new name.txt",
+			want:  "diff --git b/new name.txt a/old name.txt",
+		},
+		{
+			name:  "quoted newline",
+			input: `diff --git "a/line\nbreak.txt" "b/other\nline.txt"`,
+			want:  `diff --git "b/other\nline.txt" "a/line\nbreak.txt"`,
+		},
+		{
+			name:  "quoted escapes and non-ASCII",
+			input: `diff --git "a/quote\"slash\\\303\251.txt" "b/renamed \"path\"\\\303\270.txt"`,
+			want:  `diff --git "b/renamed \"path\"\\\303\270.txt" "a/quote\"slash\\\303\251.txt"`,
+		},
+		{
+			name:  "CRLF",
+			input: "diff --git a/plain-old.txt b/plain-new.txt\r",
+			want:  "diff --git b/plain-new.txt a/plain-old.txt\r",
+		},
+		{
+			name:  "ambiguous paths without corroborating names",
+			input: "diff --git a/old name.txt b/new name.txt",
+			want:  "diff --git a/old name.txt b/new name.txt",
+		},
+		{
+			name:  "malformed quoting",
+			input: `diff --git "a/old b/new`,
+			orig:  "a/old",
+			new:   "b/new",
+			want:  `diff --git "a/old b/new`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fd := &FileDiff{OrigName: test.orig, NewName: test.new, Extended: []string{test.input}}
+			reversed, err := ReverseFileDiff(fd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := reversed.Extended[0]; got != test.want {
+				t.Errorf("diff --git header: got %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
