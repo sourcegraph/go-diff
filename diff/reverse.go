@@ -15,7 +15,7 @@ var ErrCannotReverseCopy = errors.New("cannot reverse a git copy diff")
 // cannot be reversed because they do not contain enough information to delete
 // the copied file.
 func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
-	extended, err := reverseExtendedHeaders(fd.Extended)
+	extended, err := reverseExtendedHeaders(fd.Extended, fd.OrigName, fd.NewName)
 	if err != nil {
 		return nil, err
 	}
@@ -37,13 +37,14 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 }
 
 // reverseExtendedHeaders reverses the direction encoded in git's extended headers.
-func reverseExtendedHeaders(headers []string) ([]string, error) {
+func reverseExtendedHeaders(headers []string, origName, newName string) ([]string, error) {
 	// handleEmpty gates on the same prefix when it reads the direction back out.
 	if len(headers) == 0 || !strings.HasPrefix(headers[0], "diff --git ") {
 		return headers, nil
 	}
 	reversed := make([]string, len(headers))
 	copy(reversed, headers)
+	reversed[0] = reverseDiffGitHeader(reversed[0], origName, newName)
 	for i, header := range reversed {
 		switch {
 		case strings.HasPrefix(header, "new file mode "):
@@ -59,6 +60,64 @@ func reverseExtendedHeaders(headers []string) ([]string, error) {
 	swapHeaderValues(reversed, "old mode ", "new mode ")
 	swapHeaderValues(reversed, "rename from ", "rename to ")
 	return reversed, nil
+}
+
+// reverseDiffGitHeader swaps the two path arguments while preserving their
+// original quoting. The parsed filenames are used only to reject malformed or
+// ambiguous input; names recovered from other headers can disambiguate Git's
+// unquoted paths containing spaces.
+func reverseDiffGitHeader(header, origName, newName string) string {
+	const prefix = "diff --git "
+	args := header[len(prefix):]
+	lineEnding := ""
+	if strings.HasSuffix(args, "\r") {
+		args = strings.TrimSuffix(args, "\r")
+		lineEnding = "\r"
+	}
+
+	first, second, valid := parseDiffGitArgs(args)
+	if !valid {
+		return header
+	}
+
+	var rawFirst, rawSecond string
+	switch {
+	case first != "" && second != "":
+		var ok bool
+		rawFirst, rawSecond, ok = splitDiffGitArgs(args, first, second)
+		if !ok {
+			return header
+		}
+	case origName != "" && newName != "" && args == origName+" "+newName:
+		rawFirst, rawSecond = origName, newName
+	default:
+		return header
+	}
+
+	return prefix + rawSecond + " " + rawFirst + lineEnding
+}
+
+// splitDiffGitArgs locates the raw argument boundary after parseDiffGitArgs has
+// validated and decoded both paths.
+func splitDiffGitArgs(args, first, second string) (string, string, bool) {
+	if args[0] == '"' {
+		_, remainder, err := readQuotedFilename(args)
+		if err != nil || len(remainder) < 2 || remainder[0] != ' ' {
+			return "", "", false
+		}
+		return args[:len(args)-len(remainder)], remainder[1:], true
+	}
+	if args[len(args)-1] == '"' {
+		i := strings.IndexByte(args, '"')
+		if i < 2 || args[i-1] != ' ' {
+			return "", "", false
+		}
+		return args[:i-1], args[i:], true
+	}
+	if args != first+" "+second {
+		return "", "", false
+	}
+	return first, second, true
 }
 
 // swapHeaderValues exchanges the values of the first "from" header and the
