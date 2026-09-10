@@ -169,6 +169,13 @@ func TestReverseRoundTripOnTestdata(t *testing.T) {
 			}
 
 			if fileDiffs, err := ParseMultiFileDiff(data); err == nil && len(fileDiffs) > 0 {
+				if name == "complicated_filenames.diff" {
+					if _, err := ReverseMultiFileDiff(fileDiffs); err == nil {
+						t.Fatal("reversing fixture with copy diffs succeeded")
+					}
+					return
+				}
+
 				reversed, err := ReverseMultiFileDiff(fileDiffs)
 				if err != nil {
 					t.Fatalf("first reverse: %s", err)
@@ -214,5 +221,105 @@ func TestReverseRoundTripOnTestdata(t *testing.T) {
 
 			t.Fatalf("fixture did not contain parseable file diffs or hunks")
 		})
+	}
+}
+
+func TestReverseFileDiffExtendedHeaders(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "new file",
+			input: []string{"diff --git a/f b/f", "new file mode 100644", "index 0000000..587be6b"},
+			want:  []string{"diff --git a/f b/f", "deleted file mode 100644", "index 587be6b..0000000"},
+		},
+		{
+			name:  "deleted file",
+			input: []string{"diff --git a/f b/f", "deleted file mode 100644", "index 587be6b..0000000"},
+			want:  []string{"diff --git a/f b/f", "new file mode 100644", "index 0000000..587be6b"},
+		},
+		{
+			name:  "rename",
+			input: []string{"diff --git a/old b/new", "similarity index 70%", "rename from old", "rename to new", "index 94954ab..8b14c4f 100644"},
+			want:  []string{"diff --git a/old b/new", "similarity index 70%", "rename from new", "rename to old", "index 8b14c4f..94954ab 100644"},
+		},
+		{
+			name:  "mode change",
+			input: []string{"diff --git a/f b/f", "old mode 100644", "new mode 100755"},
+			want:  []string{"diff --git a/f b/f", "old mode 100755", "new mode 100644"},
+		},
+		{
+			name:  "CRLF index",
+			input: []string{"diff --git a/f b/f\r", "index 94954ab..8b14c4f 100644\r"},
+			want:  []string{"diff --git a/f b/f\r", "index 8b14c4f..94954ab 100644\r"},
+		},
+		{
+			name:  "no extended headers",
+			input: nil,
+			want:  nil,
+		},
+		{
+			// Only git emits extended headers, so leave anything else alone.
+			name:  "non-git header block",
+			input: []string{"diff --ruN a/f b/f", "old mode 0777", "new mode 0755"},
+			want:  []string{"diff --ruN a/f b/f", "old mode 0777", "new mode 0755"},
+		},
+	}
+	for _, test := range tests {
+		orig := append([]string(nil), test.input...)
+		fd := &FileDiff{OrigName: "a/f", NewName: "b/f", Extended: test.input}
+		reversed, err := ReverseFileDiff(fd)
+		if err != nil {
+			t.Errorf("%s: ReverseFileDiff: %s", test.name, err)
+			continue
+		}
+		if d := cmp.Diff(test.want, reversed.Extended); d != "" {
+			t.Errorf("%s: reversed extended headers differ (-want +got):\n%s", test.name, d)
+		}
+		if d := cmp.Diff(orig, fd.Extended); d != "" {
+			t.Errorf("%s: ReverseFileDiff mutated its input (-want +got):\n%s", test.name, d)
+		}
+	}
+}
+
+func TestReverseFileDiffRejectsCopy(t *testing.T) {
+	input := []byte("diff --git a/old b/new\nsimilarity index 100%\ncopy from old\ncopy to new\n")
+	fd, err := ParseFileDiff(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReverseFileDiff(fd); err == nil {
+		t.Fatal("ReverseFileDiff succeeded for a copy diff")
+	}
+}
+
+func TestReverseFileDiffEmptyNewFile(t *testing.T) {
+	input := []byte("diff --git a/empty.txt b/empty.txt\nnew file mode 100644\nindex 0000000..e69de29\n")
+	fd, err := ParseFileDiff(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reversed, err := ReverseFileDiff(fd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	printed, err := PrintFileDiff(reversed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roundTrip, err := ParseFileDiff(printed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The forward diff creates the file, so it parses as OrigName=/dev/null.
+	// Reversing it must delete the file, i.e. NewName=/dev/null.
+	if fd.OrigName != "/dev/null" {
+		t.Fatalf("forward diff: got OrigName=%q, want /dev/null", fd.OrigName)
+	}
+	if roundTrip.NewName != "/dev/null" || roundTrip.OrigName == "/dev/null" {
+		t.Errorf("reversed empty new-file diff: got OrigName=%q NewName=%q, want NewName=/dev/null\nprinted:\n%s",
+			roundTrip.OrigName, roundTrip.NewName, printed)
 	}
 }
