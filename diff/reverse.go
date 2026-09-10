@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ReverseFileDiff takes a diff.FileDiff, and returns the reverse operation.
@@ -14,7 +15,7 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 		OrigTime: fd.NewTime,
 		NewName:  fd.OrigName,
 		NewTime:  fd.OrigTime,
-		Extended: fd.Extended,
+		Extended: reverseExtendedHeaders(fd.Extended),
 	}
 	for _, hunk := range fd.Hunks {
 		invHunk, err := reverseHunk(hunk)
@@ -24,6 +25,69 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 		reverse.Hunks = append(reverse.Hunks, invHunk)
 	}
 	return &reverse, nil
+}
+
+// reverseExtendedHeaders reverses the direction encoded in git's extended
+// header lines, matching what "git diff -R" emits.
+func reverseExtendedHeaders(headers []string) []string {
+	// handleEmpty gates on the same prefix when it reads the direction back out.
+	if len(headers) == 0 || !strings.HasPrefix(headers[0], "diff --git ") {
+		return headers
+	}
+	reversed := make([]string, len(headers))
+	copy(reversed, headers)
+	for i, header := range reversed {
+		switch {
+		case strings.HasPrefix(header, "new file mode "):
+			reversed[i] = "deleted file mode " + header[len("new file mode "):]
+		case strings.HasPrefix(header, "deleted file mode "):
+			reversed[i] = "new file mode " + header[len("deleted file mode "):]
+		case strings.HasPrefix(header, "index "):
+			reversed[i] = reverseIndexHeader(header)
+		}
+	}
+	swapHeaderValues(reversed, "old mode ", "new mode ")
+	swapHeaderValues(reversed, "rename from ", "rename to ")
+	swapHeaderValues(reversed, "copy from ", "copy to ")
+	return reversed
+}
+
+// swapHeaderValues exchanges the values of the first "from" header and the
+// first "to" header, leaving both prefixes where they are.
+func swapHeaderValues(headers []string, fromPrefix, toPrefix string) {
+	from, to := -1, -1
+	for i, header := range headers {
+		if from < 0 && strings.HasPrefix(header, fromPrefix) {
+			from = i
+		}
+		if to < 0 && strings.HasPrefix(header, toPrefix) {
+			to = i
+		}
+	}
+	if from < 0 || to < 0 {
+		return
+	}
+	headers[from], headers[to] = fromPrefix+headers[to][len(toPrefix):], toPrefix+headers[from][len(fromPrefix):]
+}
+
+// reverseIndexHeader swaps the two blob hashes in an "index <old>..<new>[ <mode>]"
+// header, leaving the trailing mode (if any) alone.
+func reverseIndexHeader(header string) string {
+	const prefix = "index "
+	rest := header[len(prefix):]
+	var suffix string
+	if strings.HasSuffix(rest, "\r") {
+		rest, suffix = rest[:len(rest)-1], "\r"
+	}
+	var mode string
+	if i := strings.IndexByte(rest, ' '); i >= 0 {
+		rest, mode = rest[:i], rest[i:]
+	}
+	i := strings.Index(rest, "..")
+	if i < 0 {
+		return header
+	}
+	return prefix + rest[i+2:] + ".." + rest[:i] + mode + suffix
 }
 
 // ReverseMultiFileDiff reverses a series of FileDiffs.
