@@ -38,27 +38,27 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 
 // reverseExtendedHeaders reverses the direction encoded in git's extended headers.
 func reverseExtendedHeaders(headers []string, origName, newName string) ([]string, error) {
-	// handleEmpty gates on the same prefix when it reads the direction back out.
-	if len(headers) == 0 || !strings.HasPrefix(headers[0], "diff --git ") {
+	parsed, ok := parseGitExtendedHeaders(headers)
+	if !ok {
 		return headers, nil
 	}
 	reversed := make([]string, len(headers))
 	copy(reversed, headers)
 	reversed[0] = reverseDiffGitHeader(reversed[0], origName, newName)
-	for i, header := range reversed {
-		switch {
-		case strings.HasPrefix(header, "new file mode "):
-			reversed[i] = "deleted file mode " + header[len("new file mode "):]
-		case strings.HasPrefix(header, "deleted file mode "):
-			reversed[i] = "new file mode " + header[len("deleted file mode "):]
-		case strings.HasPrefix(header, "index "):
+	for i, header := range parsed {
+		switch header.kind {
+		case gitExtendedHeaderNewFileMode:
+			reversed[i] = gitExtendedHeaderDeletedFileMode + header.value()
+		case gitExtendedHeaderDeletedFileMode:
+			reversed[i] = gitExtendedHeaderNewFileMode + header.value()
+		case gitExtendedHeaderIndex:
 			reversed[i] = reverseIndexHeader(header)
-		case strings.HasPrefix(header, "copy from "), strings.HasPrefix(header, "copy to "):
+		case gitExtendedHeaderCopyFrom, gitExtendedHeaderCopyTo:
 			return nil, ErrCannotReverseCopy
 		}
 	}
-	swapHeaderValues(reversed, "old mode ", "new mode ")
-	swapHeaderValues(reversed, "rename from ", "rename to ")
+	swapHeaderValues(reversed, parsed, gitModeHeaderPair)
+	swapHeaderValues(reversed, parsed, gitRenameHeaderPair)
 	return reversed, nil
 }
 
@@ -67,7 +67,7 @@ func reverseExtendedHeaders(headers []string, origName, newName string) ([]strin
 // ambiguous input; names recovered from other headers can disambiguate Git's
 // unquoted paths containing spaces.
 func reverseDiffGitHeader(header, origName, newName string) string {
-	const prefix = "diff --git "
+	const prefix = gitExtendedHeaderDiff
 	args := header[len(prefix):]
 	lineEnding := ""
 	if strings.HasSuffix(args, "\r") {
@@ -122,30 +122,23 @@ func splitDiffGitArgs(args, first, second string) (string, string, bool) {
 
 // swapHeaderValues exchanges the values of the first "from" header and the
 // first "to" header, leaving both prefixes where they are.
-func swapHeaderValues(headers []string, fromPrefix, toPrefix string) {
-	from, to := -1, -1
-	for i, header := range headers {
-		if from < 0 && strings.HasPrefix(header, fromPrefix) {
-			from = i
-		}
-		if to < 0 && strings.HasPrefix(header, toPrefix) {
-			to = i
-		}
-	}
-	if from < 0 || to < 0 {
+func swapHeaderValues(headers []string, parsed gitExtendedHeaders, pair gitExtendedHeaderPair) {
+	from, to, ok := parsed.pairIndices(pair)
+	if !ok {
 		return
 	}
-	headers[from], headers[to] = fromPrefix+headers[to][len(toPrefix):], toPrefix+headers[from][len(fromPrefix):]
+	headers[from] = pair.from + parsed[to].value()
+	headers[to] = pair.to + parsed[from].value()
 }
 
 // reverseIndexHeader swaps the two blob hashes in an "index <old>..<new>[ <mode>]"
 // header, leaving the trailing mode (if any) alone.
-func reverseIndexHeader(header string) string {
-	const prefix = "index "
-	oldHash, newHash, ok := strings.Cut(header[len(prefix):], "..")
+func reverseIndexHeader(header gitExtendedHeader) string {
+	oldHash, newHash, ok := strings.Cut(header.value(), "..")
 	if !ok || strings.ContainsAny(oldHash, " \r") {
-		return header
+		return header.raw
 	}
+	prefix := gitExtendedHeaderIndex
 	if i := strings.IndexAny(newHash, " \r"); i >= 0 {
 		return prefix + newHash[:i] + ".." + oldHash + newHash[i:]
 	}

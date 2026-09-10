@@ -256,6 +256,16 @@ func TestReverseFileDiffExtendedHeaders(t *testing.T) {
 			want:  []string{"diff --git b/f a/f\r", "index 8b14c4f..94954ab 100644\r"},
 		},
 		{
+			name:  "CRLF mode and rename",
+			input: []string{"diff --git a/old b/new\r", "old mode 100644\r", "new mode 100755\r", "rename from old\r", "rename to new\r"},
+			want:  []string{"diff --git b/new a/old\r", "old mode 100755\r", "new mode 100644\r", "rename from new\r", "rename to old\r"},
+		},
+		{
+			name:  "unknown and malformed headers",
+			input: []string{"diff --git a/f b/f", "x-header value", "old mode 100644", "copy from", "index missing-separator"},
+			want:  []string{"diff --git b/f a/f", "x-header value", "old mode 100644", "copy from", "index missing-separator"},
+		},
+		{
 			name:  "no extended headers",
 			input: nil,
 			want:  nil,
@@ -343,13 +353,15 @@ func TestReverseFileDiffGitHeader(t *testing.T) {
 }
 
 func TestReverseFileDiffRejectsCopy(t *testing.T) {
-	input := []byte("diff --git a/old b/new\nsimilarity index 100%\ncopy from old\ncopy to new\n")
-	fd, err := ParseFileDiff(input)
-	if err != nil {
-		t.Fatal(err)
+	tests := [][]string{
+		{"diff --git a/old b/new", "similarity index 100%", "copy from old", "copy to new"},
+		{"diff --git a/old b/new", "copy from old"},
 	}
-	if _, err := ReverseFileDiff(fd); err != ErrCannotReverseCopy {
-		t.Fatalf("ReverseFileDiff error = %v, want ErrCannotReverseCopy", err)
+	for _, extended := range tests {
+		fd := &FileDiff{Extended: extended}
+		if _, err := ReverseFileDiff(fd); err != ErrCannotReverseCopy {
+			t.Errorf("ReverseFileDiff error = %v, want ErrCannotReverseCopy for headers %q", err, extended)
+		}
 	}
 }
 
