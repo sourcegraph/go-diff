@@ -116,6 +116,10 @@ func TestReverseMultiFileDiff(t *testing.T) {
 			inputFile: "sample_multi_file.diff",
 			wantFile:  "sample_multi_file.reversed",
 		},
+		{
+			inputFile: "sample_contains_added_deleted_files.diff",
+			wantFile:  "sample_contains_added_deleted_files.reversed",
+		},
 	}
 	for _, test := range tests {
 		inputData, err := os.ReadFile(filepath.Join("testdata", test.inputFile))
