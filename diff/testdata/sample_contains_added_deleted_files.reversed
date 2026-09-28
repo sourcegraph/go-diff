@@ -1,0 +1,11 @@
+diff -u source_a/file_1.txt  source_b/file_1.txt
+--- source_b/file_1.txt
++++ source_a/file_1.txt
+@@ -3,4 +2,3 @@
+ To be, or not to be, that is the question:
+-The slings and arrows of outrageous fortune,
+-Or to take arms against a sea of troubles
++Whether 'tis nobler in the mind to suffer
+ And by opposing end them. To die—to sleep,
+Only in source_a: file_2.txt
+Only in source_b: file_3.txt
