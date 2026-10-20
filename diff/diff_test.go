@@ -5,6 +5,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"io"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -951,6 +952,51 @@ func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 		}
 		if !bytes.Equal(printed, diffData) {
 			t.Errorf("%s: printed multi-file diff != original multi-file diff\n\n# PrintMultiFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, printed))
+		}
+
+		var written bytes.Buffer
+		if err := WriteMultiFileDiff(&written, diffs); err != nil {
+			t.Errorf("%s: WriteMultiFileDiff: %s", test.filename, err)
+		}
+		if !bytes.Equal(written.Bytes(), diffData) {
+			t.Errorf("%s: written multi-file diff != original multi-file diff\n\n# WriteMultiFileDiff output - Original:\n%s", test.filename, cmp.Diff(diffData, written.Bytes()))
+		}
+	}
+}
+
+// failingWriter fails the write that goes past the first n bytes and accepts
+// all other writes, so a caller that ignores that one error goes unnoticed.
+type failingWriter struct{ n int }
+
+func (w *failingWriter) Write(p []byte) (int, error) {
+	if len(p) > w.n {
+		n := w.n
+		w.n = math.MaxInt
+		return n, io.ErrShortWrite
+	}
+	w.n -= len(p)
+	return len(p), nil
+}
+
+func TestWriteMultiFileDiffReturnsWriteError(t *testing.T) {
+	// Covers extended headers, "Only in" lines, timestamps, sections and
+	// missing newlines, so that every write in the printer can fail.
+	diffData, err := ioutil.ReadFile(filepath.Join("testdata", "sample_contains_added_deleted_files.diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffData = append(diffData, "--- a\t2009-10-11 15:12:20.000000000 -0700\n+++ b\n@@ -1,1 +1,1 @@ section\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file\n"...)
+	diffs, err := ParseMultiFileDiff(diffData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	printed, err := PrintMultiFileDiff(diffs)
+	if err != nil || !bytes.Equal(printed, diffData) {
+		t.Fatalf("PrintMultiFileDiff did not round-trip: %v", err)
+	}
+	for n := 0; n < len(printed); n++ {
+		if err := WriteMultiFileDiff(&failingWriter{n: n}, diffs); err != io.ErrShortWrite {
+			t.Fatalf("failing after %d bytes: got err %v, want %v", n, err, io.ErrShortWrite)
 		}
 	}
 }
