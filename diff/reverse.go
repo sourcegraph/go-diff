@@ -26,6 +26,10 @@ func ReverseFileDiff(fd *FileDiff) (*FileDiff, error) {
 		NewTime:  fd.OrigTime,
 		Extended: extended,
 	}
+	// "Only in" lines read the same in both directions.
+	if fd.NewName == "" {
+		reverse.OrigName, reverse.NewName = fd.OrigName, fd.NewName
+	}
 	for _, hunk := range fd.Hunks {
 		invHunk, err := reverseHunk(hunk)
 		if err != nil {
