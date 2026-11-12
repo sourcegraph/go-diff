@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Prepares a fresh Amp orb to build and test go-diff.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# The orb base image has no Go. go.mod only sets a minimum version, so install
+# the current stable release, and link it into /usr/local/bin so every shell
+# finds it without profile changes.
+if [ ! -x /usr/local/go/bin/go ]; then
+  version="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -n1)"
+  echo "Installing $version"
+  curl -fsSL "https://go.dev/dl/$version.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz
+fi
+sudo ln -sf /usr/local/go/bin/go /usr/local/go/bin/gofmt /usr/local/bin/
+go version
+
+go mod download
