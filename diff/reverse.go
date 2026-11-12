@@ -59,7 +59,81 @@ func reverseExtendedHeaders(headers []string, origName, newName string) ([]strin
 	}
 	swapHeaderValues(reversed, parsed, gitModeHeaderPair)
 	swapHeaderValues(reversed, parsed, gitRenameHeaderPair)
+	reverseBinaryPatchSections(reversed)
 	return reversed, nil
+}
+
+// reverseBinaryPatchSections swaps the two encoded sections of a GIT binary
+// patch. git apply uses the first section as the forward result and the
+// second as the reverse result.
+func reverseBinaryPatchSections(headers []string) {
+	start := -1
+	for i, header := range headers {
+		if strings.TrimRight(header, "\r") == gitExtendedHeaderBinaryPatch {
+			start = i
+			break
+		}
+	}
+	if start < 0 || start+1 >= len(headers) {
+		return
+	}
+	first, rest, ok := takeBinarySection(headers[start+1:])
+	if !ok {
+		return
+	}
+	second, tail, ok := takeBinarySection(rest)
+	if !ok {
+		return
+	}
+	swapped := make([]string, 0, len(headers))
+	swapped = append(swapped, headers[:start+1]...)
+	swapped = append(swapped, second...)
+	swapped = append(swapped, first...)
+	swapped = append(swapped, tail...)
+	copy(headers, swapped)
+}
+
+func takeBinarySection(lines []string) (section, rest []string, ok bool) {
+	if len(lines) == 0 || !isBinarySectionHeader(lines[0]) {
+		return nil, lines, false
+	}
+	end := 1
+	for end < len(lines) {
+		if isBinarySectionHeader(lines[end]) {
+			break
+		}
+		end++
+		if isBlankHeader(lines[end-1]) {
+			break
+		}
+	}
+	return lines[:end], lines[end:], true
+}
+
+func isBinarySectionHeader(line string) bool {
+	line = strings.TrimRight(line, "\r")
+	var n string
+	switch {
+	case strings.HasPrefix(line, "literal "):
+		n = strings.TrimPrefix(line, "literal ")
+	case strings.HasPrefix(line, "delta "):
+		n = strings.TrimPrefix(line, "delta ")
+	default:
+		return false
+	}
+	if n == "" {
+		return false
+	}
+	for i := 0; i < len(n); i++ {
+		if n[i] < '0' || n[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isBlankHeader(line string) bool {
+	return strings.TrimRight(line, "\r") == ""
 }
 
 // reverseDiffGitHeader swaps the two path arguments while preserving their

@@ -114,8 +114,8 @@ func TestReverseFileDiffGitSemantics(t *testing.T) {
 	}
 }
 
-// Git binary patches contain both directions. Reversing the index hashes makes
-// git apply select the inverse payload without reordering the encoded sections.
+// git apply uses the first encoded section as the forward result and the
+// second as the reverse result. Reversing a patch swaps those sections.
 func TestReverseFileDiffGitBinarySemantics(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -134,10 +134,10 @@ func TestReverseFileDiffGitBinarySemantics(t *testing.T) {
 			reverse: "diff --git b/literal.bin a/literal.bin\n" +
 				"index e0d84f457d2b5c802ecd286e7e576365d94af3b9..acdc746399905e5ea0d9d4163d2b3c4d04b05123 100644\n" +
 				"GIT binary patch\n" +
-				"literal 8\n" +
-				"PcmZQzWMXDvWn%{b09*ha\n\n" +
 				"literal 64\n" +
-				"LcmZ>CqznK65PlFr\n\n",
+				"LcmZ>CqznK65PlFr\n\n" +
+				"literal 8\n" +
+				"PcmZQzWMXDvWn%{b09*ha\n\n",
 		},
 		{
 			name: "delta",
@@ -151,10 +151,27 @@ func TestReverseFileDiffGitBinarySemantics(t *testing.T) {
 			reverse: "diff --git b/delta.bin a/delta.bin\n" +
 				"index b762194ffce13918858bfd54f1c4ded144c7e3b4..df437f42c808d41dec5d543d60ce94c8cb8a044a 100644\n" +
 				"GIT binary patch\n" +
-				"delta 20\n" +
-				"bcmZorXi(U2ft@2cBQY;MHAQjb4Gj(ePVNVE\n\n" +
 				"delta 10\n" +
-				"PcmZorXi!+h!2v`75gY=g\n\n",
+				"PcmZorXi!+h!2v`75gY=g\n\n" +
+				"delta 20\n" +
+				"bcmZorXi(U2ft@2cBQY;MHAQjb4Gj(ePVNVE\n\n",
+		},
+		{
+			name: "reported lengths",
+			forward: "diff --git a/bin.dat b/bin.dat\n" +
+				"index bdc955b7b2e610ad5a72302b139a2e6cb325519a..eaf36c1daccfdf325514461cd1a2ffbc139b5464 100644\n" +
+				"GIT binary patch\n" +
+				"literal 4\n" +
+				"LcmZQzWMT#Y01f~L\n\n" +
+				"literal 2\n" +
+				"JcmZQz1ONa700IC2\n\n",
+			reverse: "diff --git b/bin.dat a/bin.dat\n" +
+				"index eaf36c1daccfdf325514461cd1a2ffbc139b5464..bdc955b7b2e610ad5a72302b139a2e6cb325519a 100644\n" +
+				"GIT binary patch\n" +
+				"literal 2\n" +
+				"JcmZQz1ONa700IC2\n\n" +
+				"literal 4\n" +
+				"LcmZQzWMT#Y01f~L\n\n",
 		},
 	}
 
