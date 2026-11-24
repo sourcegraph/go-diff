@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -73,8 +74,6 @@ func WriteMultiFileDiff(w io.Writer, ds []*FileDiff) error {
 //
 // Hunk bodies are written to w directly, without intermediate copies, so many
 // small writes go to w. Wrap w in a bufio.Writer if those writes are costly.
-//
-// TODO(sqs): handle escaping whitespace/etc. chars in filenames
 func WriteFileDiff(w io.Writer, d *FileDiff) error {
 	return (&printer{w: w}).fileDiff(d)
 }
@@ -115,12 +114,44 @@ func (p *printer) fileDiff(d *FileDiff) error {
 }
 
 func (p *printer) fileHeader(prefix string, filename string, timestamp *time.Time) error {
-	p.line = append(append(p.line[:0], prefix...), filename...)
+	p.line = appendFileName(append(p.line[:0], prefix...), filename)
 	if timestamp != nil {
 		p.line = timestamp.AppendFormat(append(p.line, '\t'), diffTimeFormatLayout)
+	} else if p.line[len(p.line)-1] != '"' && strings.Contains(filename, " ") {
+		// Like git, mark the end of a name with spaces with a tab.
+		p.line = append(p.line, '\t')
 	}
 	p.line = append(p.line, '\n')
 	return p.writeLine()
+}
+
+// appendFileName appends filename to line. Like git, it quotes names with
+// control characters, double quotes or backslashes as C string literals. Names
+// with surrounding whitespace are quoted too.
+func appendFileName(line []byte, filename string) []byte {
+	special := strings.IndexFunc(filename, func(r rune) bool {
+		return r < ' ' || r == '"' || r == '\\' || r == 0x7f
+	}) >= 0
+	// Surrounding whitespace is not part of an unquoted name.
+	if !special && strings.TrimSpace(filename) == filename {
+		return append(line, filename...)
+	}
+
+	line = append(line, '"')
+	for i := 0; i < len(filename); i++ {
+		c := filename[i]
+		switch {
+		case c == '"' || c == '\\':
+			line = append(line, '\\', c)
+		case '\a' <= c && c <= '\r':
+			line = append(line, '\\', "abtnvfr"[c-'\a'])
+		case c < ' ' || c >= 0x7f:
+			line = append(line, '\\', '0'+(c>>6), '0'+(c>>3&7), '0'+(c&7))
+		default:
+			line = append(line, c)
+		}
+	}
+	return append(line, '"')
 }
 
 func (p *printer) hunks(hunks []*Hunk) error {

@@ -898,6 +898,54 @@ func TestParseFileDiffAndPrintFileDiff(t *testing.T) {
 	}
 }
 
+func TestPrintFileDiff_QuotesFileNames(t *testing.T) {
+	const hunk = "@@ -1,1 +1,1 @@\n-a\n+b\n"
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"a/plain.txt", "a/plain.txt"},
+		{"a/with space.txt", "a/with space.txt\t"},
+		{"a/f 2020-01-01 00:00:00 +0000", "a/f 2020-01-01 00:00:00 +0000\t"},
+		{"a/é.txt", "a/é.txt"},
+		{"a/tab\tname", `"a/tab\tname"`},
+		{"a/new\nline", `"a/new\nline"`},
+		{"a/cr\rname", `"a/cr\rname"`},
+		{"a/say \"hi\".txt", `"a/say \"hi\".txt"`},
+		{`a/back\slash`, `"a/back\\slash"`},
+		{"a/\x01\x7f", `"a/\001\177"`},
+		{"a/trailing ", `"a/trailing "`},
+		{" leading", `" leading"`},
+		{"`backtick`", "`backtick`"},
+		{"'q'", "'q'"},
+		{"a/é\t", `"a/\303\251\t"`},
+	}
+	for _, test := range tests {
+		hunks, err := ParseHunks([]byte(hunk))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := PrintFileDiff(&FileDiff{OrigName: test.name, NewName: test.name, Hunks: hunks})
+		if err != nil {
+			t.Errorf("%q: PrintFileDiff: %s", test.name, err)
+			continue
+		}
+		want := "--- " + test.want + "\n+++ " + test.want + "\n" + hunk
+		if string(got) != want {
+			t.Errorf("%q: printed diff mismatch\ngot:\n%s\nwant:\n%s", test.name, got, want)
+		}
+
+		parsed, err := ParseFileDiff(got)
+		if err != nil {
+			t.Errorf("%q: ParseFileDiff: %s", test.name, err)
+			continue
+		}
+		if parsed.OrigName != test.name || parsed.NewName != test.name {
+			t.Errorf("%q: names after printing and parsing: %q, %q", test.name, parsed.OrigName, parsed.NewName)
+		}
+	}
+}
+
 func TestParseMultiFileDiffAndPrintMultiFileDiff(t *testing.T) {
 	tests := []struct {
 		filename        string
