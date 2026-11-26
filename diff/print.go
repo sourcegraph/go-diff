@@ -117,8 +117,9 @@ func (p *printer) fileHeader(prefix string, filename string, timestamp *time.Tim
 	p.line = appendFileName(append(p.line[:0], prefix...), filename)
 	if timestamp != nil {
 		p.line = timestamp.AppendFormat(append(p.line, '\t'), diffTimeFormatLayout)
-	} else if p.line[len(p.line)-1] != '"' && strings.Contains(filename, " ") {
-		// Like git, mark the end of a name with spaces with a tab.
+	} else if strings.Contains(filename, " ") {
+		// Like git, mark the end of a name with spaces with a tab, quoted or
+		// not, so that surrounding spaces stay part of the name.
 		p.line = append(p.line, '\t')
 	}
 	p.line = append(p.line, '\n')
@@ -126,14 +127,11 @@ func (p *printer) fileHeader(prefix string, filename string, timestamp *time.Tim
 }
 
 // appendFileName appends filename to line. Like git, it quotes names with
-// control characters, double quotes or backslashes as C string literals. Names
-// with surrounding whitespace are quoted too.
+// control characters, double quotes or backslashes as C string literals.
 func appendFileName(line []byte, filename string) []byte {
-	special := strings.IndexFunc(filename, func(r rune) bool {
+	if strings.IndexFunc(filename, func(r rune) bool {
 		return r < ' ' || r == '"' || r == '\\' || r == 0x7f
-	}) >= 0
-	// Surrounding whitespace is not part of an unquoted name.
-	if !special && strings.TrimSpace(filename) == filename {
+	}) < 0 {
 		return append(line, filename...)
 	}
 

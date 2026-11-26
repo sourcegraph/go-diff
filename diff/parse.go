@@ -325,16 +325,22 @@ func (r *FileDiffReader) readOneFileHeader(prefix []byte) (filename string, time
 	r.line++
 	line = line[len(prefix):]
 
-	trimmedLine := strings.TrimSpace(string(line)) // filenames that contain spaces may be terminated by a tab
-	parts := strings.SplitN(trimmedLine, "\t", 2)
-	filename = parts[0]
-	if len(parts) == 2 {
+	// A tab ends the name, so spaces before it, such as the trailing space in
+	// git's "a/name \t", are part of the name. Names that contain spaces may
+	// be terminated by a tab with no timestamp after it.
+	filename, tsText, hasTab := strings.Cut(string(line), "\t")
+	if hasTab {
+		tsText = strings.TrimSpace(tsText)
+	} else {
+		filename = strings.TrimSpace(filename)
+	}
+	if tsText != "" {
 		var ts time.Time
 		// Timestamp is optional, but this header has it.
-		ts, err = time.Parse(diffTimeParseLayout, parts[1])
+		ts, err = time.Parse(diffTimeParseLayout, tsText)
 		if err != nil {
 			var err1 error
-			ts, err1 = time.Parse(diffTimeParseWithoutTZLayout, parts[1])
+			ts, err1 = time.Parse(diffTimeParseWithoutTZLayout, tsText)
 			if err1 != nil {
 				return "", nil, err
 			}
