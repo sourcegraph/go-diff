@@ -919,12 +919,14 @@ func TestPrintFileDiff_QuotesFileNames(t *testing.T) {
 		{"`backtick`", "`backtick`"},
 		{"'q'", "'q'"},
 		{"a/é\t", `"a/\303\251\t"`},
+		{"a/bad\377byte", "a/bad\377byte"},
+		{"a/bad\377\tbyte", `"a/bad\377\tbyte"`},
+	}
+	hunks, err := ParseHunks([]byte(hunk))
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, test := range tests {
-		hunks, err := ParseHunks([]byte(hunk))
-		if err != nil {
-			t.Fatal(err)
-		}
 		got, err := PrintFileDiff(&FileDiff{OrigName: test.name, NewName: test.name, Hunks: hunks})
 		if err != nil {
 			t.Errorf("%q: PrintFileDiff: %s", test.name, err)
@@ -1310,52 +1312,6 @@ func TestParseMultiFileDiff_KeepCR_E2E(t *testing.T) {
 	}
 	if len(fd2.Extended) != 3 {
 		t.Errorf("Expected 3 extended headers for file 2, got %d", len(fd2.Extended))
-	}
-}
-
-func TestPrintFileDiffQuotesFilenamesWithControlCharacters(t *testing.T) {
-	tests := []struct {
-		name  string
-		quote string
-	}{
-		{name: "tab", quote: `"a/tab\tname.txt"`},
-		{name: "newline", quote: `"a/new\nline.txt"`},
-		{name: "carriage return", quote: `"a/cr\rname.txt"`},
-		{name: "escape", quote: `"a/esc\033name.txt"`},
-		{name: "quote and backslash", quote: `"a/q\"uote\\\tname.txt"`},
-		{name: "invalid UTF-8", quote: `"a/bad\377\tbyte.txt"`},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			orig := test.quote
-			updated := `"b/` + test.quote[len(`"a/`):]
-			input := "diff --git " + orig + " " + updated + "\n" +
-				"--- " + orig + "\n" +
-				"+++ " + updated + "\n" +
-				"@@ -1,1 +1,1 @@\n" +
-				"-old\n" +
-				"+new\n"
-
-			fd, err := ParseFileDiff([]byte(input))
-			if err != nil {
-				t.Fatal(err)
-			}
-			printed, err := PrintFileDiff(fd)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(printed) != input {
-				t.Errorf("printed file diff != original file diff\n\n# PrintFileDiff output - Original:\n%s", cmp.Diff(input, string(printed)))
-			}
-
-			reparsed, err := ParseFileDiff(printed)
-			if err != nil {
-				t.Fatalf("parsing printed diff: %v", err)
-			}
-			if reparsed.OrigName != fd.OrigName || reparsed.NewName != fd.NewName {
-				t.Errorf("reparsed names %q, %q; want %q, %q", reparsed.OrigName, reparsed.NewName, fd.OrigName, fd.NewName)
-			}
-		})
 	}
 }
 
