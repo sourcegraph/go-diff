@@ -285,16 +285,18 @@ func (r *FileDiffReader) ReadFileHeaders() (origName, newName string, origTimest
 		return "", "", nil, nil, err
 	}
 
-	unquotedOrigName, err := strconv.Unquote(origName)
-	if err == nil {
-		origName = unquotedOrigName
-	}
-	unquotedNewName, err := strconv.Unquote(newName)
-	if err == nil {
-		newName = unquotedNewName
-	}
+	return unquoteFileName(origName), unquoteFileName(newName), origTimestamp, newTimestamp, nil
+}
 
-	return origName, newName, origTimestamp, newTimestamp, nil
+// unquoteFileName decodes a name quoted as a C string literal. Other names are
+// returned as they are.
+func unquoteFileName(name string) string {
+	if strings.HasPrefix(name, `"`) {
+		if unquoted, err := strconv.Unquote(name); err == nil {
+			return unquoted
+		}
+	}
+	return name
 }
 
 // readOneFileHeader reads one of the file headers (prefix should be

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // PrintMultiFileDiff prints a multi-file diff in unified diff format.
@@ -75,8 +74,6 @@ func WriteMultiFileDiff(w io.Writer, ds []*FileDiff) error {
 //
 // Hunk bodies are written to w directly, without intermediate copies, so many
 // small writes go to w. Wrap w in a bufio.Writer if those writes are costly.
-//
-// File names that contain control characters are written as quoted strings.
 func WriteFileDiff(w io.Writer, d *FileDiff) error {
 	return (&printer{w: w}).fileDiff(d)
 }
@@ -117,79 +114,44 @@ func (p *printer) fileDiff(d *FileDiff) error {
 }
 
 func (p *printer) fileHeader(prefix string, filename string, timestamp *time.Time) error {
-	p.line = append(p.line[:0], prefix...)
-	if needsQuoting(filename) {
-		p.line = appendQuotedFilename(p.line, filename)
-	} else {
-		p.line = append(p.line, filename...)
-	}
+	p.line = appendFileName(append(p.line[:0], prefix...), filename)
 	if timestamp != nil {
 		p.line = timestamp.AppendFormat(append(p.line, '\t'), diffTimeFormatLayout)
+	} else if p.line[len(p.line)-1] != '"' && strings.Contains(filename, " ") {
+		// Like git, mark the end of a name with spaces with a tab.
+		p.line = append(p.line, '\t')
 	}
 	p.line = append(p.line, '\n')
 	return p.writeLine()
 }
 
-// needsQuoting reports whether filename cannot be written verbatim in a
-// "---" or "+++" header: control characters would end the name early (a tab
-// starts the timestamp) or split the header, and a leading quote would make
-// the name look quoted when it is read back.
-func needsQuoting(filename string) bool {
-	if strings.HasPrefix(filename, `"`) {
-		return true
+// appendFileName appends filename to line. Like git, it quotes names with
+// control characters, double quotes or backslashes as C string literals. Names
+// with surrounding whitespace are quoted too.
+func appendFileName(line []byte, filename string) []byte {
+	special := strings.IndexFunc(filename, func(r rune) bool {
+		return r < ' ' || r == '"' || r == '\\' || r == 0x7f
+	}) >= 0
+	// Surrounding whitespace is not part of an unquoted name.
+	if !special && strings.TrimSpace(filename) == filename {
+		return append(line, filename...)
 	}
+
+	line = append(line, '"')
 	for i := 0; i < len(filename); i++ {
-		if c := filename[i]; c < ' ' || c == 0x7f {
-			return true
-		}
-	}
-	return false
-}
-
-// appendQuotedFilename appends filename to dst as a C-style quoted string, the
-// way git quotes unusual paths, so that the parser unquotes it back to
-// filename.
-func appendQuotedFilename(dst []byte, filename string) []byte {
-	dst = append(dst, '"')
-	for i := 0; i < len(filename); {
 		c := filename[i]
-		switch c {
-		case '"', '\\':
-			dst = append(dst, '\\', c)
-		case '\a':
-			dst = append(dst, '\\', 'a')
-		case '\b':
-			dst = append(dst, '\\', 'b')
-		case '\f':
-			dst = append(dst, '\\', 'f')
-		case '\n':
-			dst = append(dst, '\\', 'n')
-		case '\r':
-			dst = append(dst, '\\', 'r')
-		case '\t':
-			dst = append(dst, '\\', 't')
-		case '\v':
-			dst = append(dst, '\\', 'v')
+		switch {
+		case c == '"' || c == '\\':
+			line = append(line, '\\', c)
+		case '\a' <= c && c <= '\r':
+			line = append(line, '\\', "abtnvfr"[c-'\a'])
+		case c < ' ' || c >= 0x7f:
+			line = append(line, '\\', '0'+(c>>6), '0'+(c>>3&7), '0'+(c&7))
 		default:
-			if c < ' ' || c == 0x7f {
-				dst = appendOctal(dst, c)
-			} else if r, size := utf8.DecodeRuneInString(filename[i:]); r == utf8.RuneError && size == 1 {
-				// Not valid UTF-8: escape the byte so it survives unquoting.
-				dst = appendOctal(dst, c)
-			} else {
-				dst = append(dst, filename[i:i+size]...)
-				i += size
-				continue
-			}
+			line = append(line, c)
 		}
-		i++
 	}
-	return append(dst, '"')
-}
-
-// appendOctal appends c as a three-digit octal escape such as \033.
-func appendOctal(dst []byte, c byte) []byte {
-	return append(dst, '\\', '0'+c>>6, '0'+(c>>3)&7, '0'+c&7)
+	return append(line, '"')
 }
 
 func (p *printer) hunks(hunks []*Hunk) error {
